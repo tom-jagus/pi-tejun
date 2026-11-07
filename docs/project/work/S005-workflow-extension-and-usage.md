@@ -22,8 +22,8 @@ criteria.
   added through the agreed workflow-definition mechanism.
 - It uses the existing installation and terminal interface without a bespoke
   launcher or changes to an unrelated repository.
-- Discovery, inspection, validation, execution, and run-result handling apply
-  consistently to both workflows.
+- Discovery, readable definitions, validation, execution, and run-result handling
+  apply consistently to both workflows without a separate inspection command.
 - User documentation covers setup, invocation, configuration ownership, result
   locations, failures, and repeated runs.
 - An authoring example explains how to add a workflow without duplicating
@@ -35,8 +35,8 @@ criteria.
 
 - [ ] Add a second verification workflow with different inputs and a declared
       output destination through the shared definition mechanism.
-- [ ] Verify both workflows use the same installation, discovery, inspection,
-      execution, and run-result handling.
+- [ ] Verify both workflows use the same installation, discovery, readable
+      definition format, execution, and run-result handling.
 - [ ] Check the implementation and write user and authoring documentation,
       including configuration ownership and authority boundaries.
 - [ ] Run end-to-end checks and prepare evidence for each B001 acceptance

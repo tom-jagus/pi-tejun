@@ -1,0 +1,16 @@
+# Copy to ~/.local/share/pi-tejun/config.toml, or run python3 install.py.
+# The installer fills these machine-specific values from saved Pi defaults.
+# Keep credentials in Pi. Do not store them in this file.
+enabled = ["verify"]
+
+[pi]
+agent_dir = "/absolute/path/to/.pi/agent"
+# A workflow's [model] fields override these saved model defaults.
+provider = "your-provider"
+model = "your-exact-model-id"
+thinking = "low"
+extensions = ["/absolute/path/to/.pi/agent/extensions/herdr-agent-state.ts"]
+timeout_seconds = 300
+
+[paths]
+verification = "/absolute/path/to/pi-tejun/verification"

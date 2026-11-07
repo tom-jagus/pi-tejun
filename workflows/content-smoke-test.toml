@@ -1,0 +1,29 @@
+name = "content-smoke-test"
+description = "Write a short, exact Markdown result to the content-production directory."
+workspace = "content_production"
+output_dir = "."
+heading = "# Content production smoke test"
+result_text = "Pi Tejun wrote this file through the shared workflow launcher."
+tools = ["read", "write"]
+skills = []
+allowed_effects = "Read applicable instructions; create only the current Markdown result. No source changes, Git work, acceptance, installation, or publication."
+
+# No input file is required. The worker checks this exact heading and result_text.
+# Model, provider, and thinking use the saved local Pi defaults.
+prompt = """
+Run the predefined content-smoke-test workflow. No input file is required.
+Follow applicable Kijun and destination instructions.
+
+Write a Markdown file at {output_path} with exactly this content, one blank line
+between the heading and body, and one final newline:
+
+{heading}
+
+{result_text}
+
+Do not add commentary, code fences, or other sections to the file.
+You are authorized to create only that result file. Do not change source,
+configuration, or other files, run Git commands, accept recommendations,
+install anything, publish anything, or delegate work.
+After writing the file, reply with its path. Do not ask a follow-up question.
+"""

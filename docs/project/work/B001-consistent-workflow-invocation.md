@@ -1,6 +1,6 @@
 ---
 id: B001
-status: To do
+status: In progress
 ---
 
 # Consistent workflow invocation
@@ -46,11 +46,12 @@ brief.
 - Invocation does not imply approval of generated recommendations, source
   changes, Git work, or external publication.
 
-## Open questions
+## Execution contract
 
-- What command structure and discovery experience should the user have?
-- Which configuration belongs to a workflow, a destination, or the machine?
-- How should Pi resources, model selection, permissions, and session history
-  be selected for a run?
-- What minimum execution evidence and result checks are useful, and how should
-  overlapping or repeated invocations behave?
+The [manual execution contract](../../manual-execution-contract.md) records the
+agreed simple launcher model and user-verified Herdr TUI lifecycle. No separate
+inspection command is required. Readable workflow definitions and configuration
+keep inputs, allowed effects, and output destinations knowable before execution.
+The launcher now starts or reuses a dedicated `tejun` Herdr session. The
+accepted manual execution evidence is recorded in S002; failure, repeatability,
+and overlap requirements remain in S003 and S004.
