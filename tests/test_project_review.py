@@ -9,8 +9,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from test_outcomes import RunFixture
-from test_tejun import tejun
+from support import RunFixture, tejun
 
 
 TITLE = "# Project review - Saturday November 7, 2026\n\n"

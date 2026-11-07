@@ -29,7 +29,6 @@ def install(bin_dir, config_path, agent_dir):
         if not all(isinstance(value, str) and value for value in defaults):
             raise ValueError("Save Pi provider/model/thinking defaults first, or create "
                              f"{config_path} from config.example.toml.")
-        workspace = config_path.parent / "verification"
         content = (ROOT / "config.example.toml").read_text()
         substitutions = {
             '"/absolute/path/to/.pi/agent"': str(agent_dir),
@@ -37,7 +36,6 @@ def install(bin_dir, config_path, agent_dir):
             '"low"': defaults[2],
             '"/absolute/path/to/.pi/agent/extensions/herdr-agent-state.ts"':
                 str(agent_dir / "extensions/herdr-agent-state.ts"),
-            '"/absolute/path/to/pi-tejun/verification"': str(workspace),
         }
         for placeholder, value in substitutions.items():
             content = content.replace(placeholder, json.dumps(value))
@@ -45,11 +43,6 @@ def install(bin_dir, config_path, agent_dir):
         # Exclusive creation preserves an existing local config, even on races.
         with config_path.open("x") as output:
             output.write(content)
-        workspace.mkdir(parents=True, exist_ok=True)
-        source = workspace / "input.md"
-        if not source.exists():
-            with source.open("x") as output:
-                output.write((ROOT / "workflows/verify-input.md").read_text())
     bin_dir.mkdir(parents=True, exist_ok=True)
     if not os.path.lexists(link):
         link.symlink_to(target)

@@ -1,7 +1,8 @@
 # Copy to ~/.config/pi-tejun/config.toml, or run python3 install.py.
 # The installer fills these machine-specific values from saved Pi defaults.
 # Keep credentials in Pi. Do not store them in this file.
-enabled = ["verify"]
+# Enable workflows only after configuring their paths and resources.
+enabled = []
 
 [pi]
 agent_dir = "/absolute/path/to/.pi/agent"
@@ -15,7 +16,6 @@ timeout_seconds = 300
 # search_extension = "/absolute/path/to/pi-web-search/src/index.ts"
 
 [paths]
-verification = "/absolute/path/to/pi-tejun/verification"
 # Digest workspace must exist and contain a manually editable watchlist.md.
 # digest_briefs = "~/src/default/digest-briefs"
 
