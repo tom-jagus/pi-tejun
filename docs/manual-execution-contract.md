@@ -20,8 +20,11 @@ verification workflows are available; see the
 [S004](project/work/S004-repeatable-isolated-runs.md) implement the failure,
 repeatability, explicit-history, and overlap behavior below. Their accepted
 review evidence distinguishes credential-free checks from the earlier S002
-live demonstration. S005 still owns combined B001 verification and authoring
-documentation.
+live demonstration. [S005](project/work/S005-workflow-extension-and-usage.md)
+adds a tested [authoring guide](workflow-authoring.md) and combined
+[B001 verification evidence](b001-verification.md). Both S005 and B001 passed
+the user-delegated acceptance review. The accepted runner validates exact-content
+Markdown verification results, not arbitrary generated reports.
 
 ## User interface
 

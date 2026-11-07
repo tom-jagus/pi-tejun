@@ -1,6 +1,6 @@
 ---
 id: B001
-status: In progress
+status: Done
 ---
 
 # Consistent workflow invocation
@@ -55,5 +55,44 @@ keep inputs, allowed effects, and output destinations knowable before execution.
 The launcher starts or reuses a dedicated `tejun` Herdr session, preserves
 existing outputs, and coordinates declared shared files. Individual slice
 reviews record the accepted manual, failure, repeatability, and overlap
-evidence. Workflow-extension documentation and combined outcome verification
-remain in S005; B001 has not yet been accepted as a whole.
+evidence. The [authoring guide](../../workflow-authoring.md) documents workflow
+extension, and the [verification evidence](../../b001-verification.md) maps the
+combined delivery to every criterion above.
+
+## Review
+
+All six acceptance criteria pass on the combined implementation, documentation,
+and verification evidence. The user explicitly delegated acceptance to this
+review if the criteria passed, followed by a commit on `main`. This assessment
+checks the brief's outcome separately from its completed slices.
+
+1. One installed command discovers and invokes both workflows from outside the
+   checkout. Current installed-command tests corroborate the earlier accepted
+   S002 live demonstration of the outside-repository manual path.
+2. Readable TOML definitions and local configuration identify each workflow's
+   purpose, input, allowed effects, and destination before execution. Discovery
+   shows resolved destinations without a separate inspection command.
+3. Preflight diagnostics, saved status, exact-content checks, and confirmed Pi
+   exit distinguish invalid inputs, unavailable dependencies, failed launches,
+   incomplete execution, and successful results. Tests cover both workflows and
+   the shared failure paths, including cancellation and unconfirmed work.
+4. Repeated runs preserve outputs, use unique run identities and fresh Pi
+   conversations, and load only declared history. Collision, overlap, shared-file
+   reservation, and recovery policies are documented and tested.
+5. A TOML definition added after installation is discovered and executed through
+   the existing command without a launcher or installer change, reinstallation,
+   or an entry-point convention in another repository.
+6. Workflow prompts retain their narrow authority. Invocation does not accept
+   recommendations or authorize source changes, Git mutations, or publication.
+   Instructions and declarations are explicitly not sandbox controls.
+
+The review reran all 40 Python tests, the Node extension check, and five Pi
+1.5.0 startup probes successfully. Current integration checks use fake Herdr;
+new live model access and desktop notifications were not tested. Prior accepted
+live evidence remains recorded in S002 and the execution contract.
+
+B001 is Done on this delegated acceptance basis. The accepted manual launcher
+currently validates exact-content Markdown verification results. Arbitrary
+report validation and domain workflows require further work; scheduled and
+event-triggered execution remains B007 scope. These limits do not prevent the
+agreed manual invocation outcome.

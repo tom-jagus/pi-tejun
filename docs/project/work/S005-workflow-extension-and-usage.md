@@ -1,6 +1,6 @@
 ---
 id: S005
-status: To do
+status: Done
 parent: B001
 depends_on:
   - S003
@@ -33,11 +33,43 @@ criteria.
 
 ## Tasks
 
-- [ ] Add a second verification workflow with different inputs and a declared
+- [x] Add a second verification workflow with different inputs and a declared
       output destination through the shared definition mechanism.
-- [ ] Verify both workflows use the same installation, discovery, readable
+- [x] Verify both workflows use the same installation, discovery, readable
       definition format, execution, and run-result handling.
-- [ ] Check the implementation and write user and authoring documentation,
+- [x] Check the implementation and write user and authoring documentation,
       including configuration ownership and authority boundaries.
-- [ ] Run end-to-end checks and prepare evidence for each B001 acceptance
+- [x] Run end-to-end checks and prepare evidence for each B001 acceptance
       criterion without treating child completion as brief acceptance.
+
+## Review
+
+All six acceptance criteria pass. The user explicitly delegated acceptance to
+this review if the criteria passed, followed by a commit on `main`.
+
+1. The existing `verify` and `content-smoke-test` definitions provide different
+   input forms and output destinations through the same TOML mechanism. S005
+   verifies that earlier delivery rather than adding a redundant workflow.
+2. Installed-command integration tests run both from outside the checkout.
+   A further test adds the authoring example after installation in a disposable
+   checkout, then discovers and runs it without reinstalling, changing the
+   launcher, or adding an entry point in a destination repository.
+3. Both definitions use the same discovery, validation, execution, and status
+   handling. Tests check named and enabled-set invocation, successful results,
+   missing configuration, incorrect results, and preserved repeated outputs.
+   The readable definitions remain the inspection mechanism.
+4. The [README](../../../README.md) documents setup, invocation, configuration,
+   results, failures, repetition, and overlap recovery.
+5. The [authoring guide](../../workflow-authoring.md) documents supported fields
+   and a complete tested example. Kijun standards, credentials, machine paths,
+   and domain history retain their separate ownership and authority boundaries.
+6. The [B001 evidence map](../../b001-verification.md) covers every brief
+   criterion. B001 was assessed separately against its combined outcome, not
+   accepted merely because its slices were complete.
+
+The review reran all 40 Python tests, the Node extension check, and five Pi
+1.5.0 startup probes successfully. Installed integration uses fake Herdr and
+real detached workers; no new live workflow or model request was performed.
+Exact-content validation and instruction-based authority limits are documented.
+No blocking findings or unmet criteria remain. S005 is Done on this delegated
+acceptance basis.

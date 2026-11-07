@@ -211,14 +211,21 @@ contact a model provider.
 
 ## Project status and documentation
 
-S001 through S004 are complete. Manual discovery, installation, background
-execution, failure handling, repeatability, and declared shared-file
-coordination are implemented. The user verified the S002 smoke test inside and
+B001 and its slices S001 through S005 are complete. Manual discovery,
+installation, background execution, failure handling, repeatability, and
+shared-file coordination are implemented. The user verified the S002 smoke test inside and
 outside this repository; S003/S004 add credential-free failure and concurrency
-checks. S005 remains for workflow-extension evidence, authoring documentation,
-and the combined B001 review. Scheduled execution and domain workflows are not
-implemented.
+checks. S005 adds installed-command checks for both definitions, a tested
+workflow-authoring example, and combined B001 verification evidence. Both S005
+and B001 passed the user-delegated acceptance review. The runner currently
+validates exact-content Markdown only. Scheduled execution and domain workflows
+are not implemented.
 
+- [Workflow authoring](docs/workflow-authoring.md) explains supported definition
+  fields, local configuration, exact-result validation, and adding a workflow
+  through the existing command.
+- [B001 verification evidence](docs/b001-verification.md) maps manual invocation
+  behavior and reproducible checks to all six brief acceptance criteria.
 - [Project charter](docs/project/charter.md) defines the purpose and boundaries.
 - [Manual execution contract](docs/manual-execution-contract.md) records the
   launcher model and manual integration evidence.
