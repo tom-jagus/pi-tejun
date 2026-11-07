@@ -23,8 +23,14 @@ review evidence distinguishes credential-free checks from the earlier S002
 live demonstration. [S005](project/work/S005-workflow-extension-and-usage.md)
 adds a tested [authoring guide](workflow-authoring.md) and combined
 [B001 verification evidence](b001-verification.md). Both S005 and B001 passed
-the user-delegated acceptance review. The accepted runner validates exact-content
-Markdown verification results, not arbitrary generated reports.
+the user-delegated acceptance review. At B001 acceptance, the runner validated
+exact-content Markdown verification results.
+
+[S007](project/work/S007-cross-project-review-workflow.md) adds the accepted
+`project-review` workflow and a specific generated-report structural check.
+Later user-approved changes give each workflow its own named workspace, keep
+default tab names, and reject another run while that workspace contains tabs.
+This does not introduce a general report-validation framework or scheduler.
 
 ## User interface
 
@@ -32,6 +38,7 @@ Markdown verification results, not arbitrary generated reports.
 tejun list
 tejun run
 tejun run content-smoke-test
+tejun run project-review
 ```
 
 `list` shows recognized workflows, their purpose, enabled state, and resolved
@@ -53,10 +60,17 @@ Invocation currently requires a terminal inside Herdr. The Python launcher
 starts work in the dedicated session named `tejun`, without focusing it or
 attaching the caller's terminal. If its server is not running, the launcher
 starts `herdr --session tejun server` as a detached process and waits for
-readiness. It creates an unfocused workspace if the session has none. It reuses
-a running session rather than starting another server. Server and workspace
-initialization are serialized with a local session lock so concurrent launches
-do not start competing servers. Other sessions remain untouched.
+readiness. It reuses a running session rather than starting another server.
+Server initialization is serialized with a local session lock so concurrent
+launches do not start competing servers. Other sessions remain untouched.
+
+Each workflow uses a workspace labelled with its exact workflow name, without
+a `tejun-` prefix. A nonblocking per-workflow file lock makes workspace lookup
+and tab reservation atomic across launchers using the same state directory.
+An existing workspace with any tabs rejects another run. Duplicate matching
+labels also reject the run rather than selecting an ambiguous workspace.
+A workspace with no tabs may be reused; otherwise creation supplies its initial
+default-named tab. The launcher never uses the first unrelated workspace.
 
 The command waits for session and Pi startup, then returns a launch
 acknowledgement rather than waiting for workflow completion. Acknowledgement
@@ -80,12 +94,15 @@ notification service. The worker records the final outcome and file path in
 local status and diagnostic files. It closes a successful workflow's tab only
 if that tab still contains just its original pane and no agent. Cleanup errors
 do not relabel a validated result as failed. The Herdr session stays running.
+Herdr removes a workspace when its last tab closes; a later run recreates it.
+If other tabs remain, the workspace remains and blocks another run of the same
+workflow. Existing shared-workspace tabs are not migrated or closed.
 
 `run` with several enabled workflows does not wait for their completion in the
 caller's terminal. All selected definitions, configuration, inputs, history
 files, and Pi resources are checked locally before session startup. Independent
-work uses separate tabs. A later runtime launch error does not roll back
-workflows already launched. Shared-file conflicts are rejected, not queued;
+workflows use separate workspaces. A later runtime launch error does not roll
+back workflows already launched. Shared-file conflicts are rejected, not queued;
 there is no general scheduler or multi-agent coordinator.
 
 ## Ownership and configuration
@@ -100,16 +117,21 @@ there is no general scheduler or multi-agent coordinator.
   resolved from `PATH`. Normal invocation does not repeat these choices.
 - Credentials remain with Pi. Do not copy them into workflow definitions,
   diagnostic records, or version control.
-- Domain material, accepted decisions, history, and generated Markdown stay in
-  the workflow's destination, not in Pi Tejun.
+- Domain material and history stay in their owning locations, not in Pi Tejun.
+  Project-review reports go to the output directory; existing project-local
+  decisions remain in authoritative project records.
 
 The implementation uses Python and its standard library, TOML workflow
 definitions, and a small Pi extension for exact-model and response-error checks.
 A verification definition declares either a relative input file or fixed
-`result_text`. Both use exact Markdown validation. Output directories resolve
-inside the configured workspace, with `.` selecting the workspace itself.
-There is no plugin framework, workflow inheritance, or general templating
-language.
+`result_text`. Both use exact Markdown validation by default.
+`result_check = "project-review"` instead declares configured root keys and
+exclusions, with no predetermined input/body. The launcher checks root access
+and passes paths to Pi; workflow instructions own discovery and recommendations.
+Output directories resolve inside the configured working directory, with `.`
+selecting that directory itself. This filesystem path is distinct from the
+Herdr workspace label. There is no plugin framework, workflow inheritance, or
+general templating language.
 
 ## Pi context and authority
 
@@ -144,6 +166,13 @@ directories, partial files, and final results are never replaced. The launcher
 reserves an empty `.partial.md` file before Pi startup so an earlier partial
 cannot establish success. Both verification workflows require exact UTF-8
 output bytes; absent, empty, incorrect, or symlinked results fail validation.
+Project review instead requires the dated title, group/category/project heading
+hierarchy, dates, configured project paths, unique entries, two short bullets,
+and optional short summary. It checks visible ordering, not independent project
+coverage, classification, or recommendation quality. An unreadable configured
+root rejects startup; instructions require inaccessible projects to remain
+visible without fabricated facts. This is not a filesystem sandbox.
+
 A Herdr idle/done state alone does not establish success.
 
 After validating the result, the worker sends Ctrl+D and confirms that Pi has
@@ -156,8 +185,8 @@ and records an incomplete outcome. Exact paths appear in local status and
 worker diagnostics.
 
 Local records identify the workflow, run, timestamps, session, result path,
-partial path, and outcome. Agent and pane identifiers are recorded when known;
-the worker records its PID. States `launching`, `started`, and `working` are
+partial path, and outcome. Workspace, agent, tab, and pane IDs are recorded when
+known; the worker records its PID. States `launching`, `started`, and `working` are
 nonterminal. `success` confirms validation, Pi exit, and publication. Handled
 launch failures record `failed`; handled execution failures or graceful
 interruption before publication record `incomplete`, with a reason. Input or
@@ -198,12 +227,20 @@ interpret coverage and selection decisions. Neither current verification
 workflow declares history. Digest history content and update rules remain B003
 work.
 
-Without shared mutable files, independent runs may overlap even in the same
-output directory because each result has its own name. `exclusive_paths`
-declares exact shared-file resources that require exclusive use, not directory
-trees. Every workflow using a shared mutable file must declare the same
-resolved resource. Files need not exist yet; existing directory paths are
-rejected. Reservations do not grant permission to modify the resource or
+Different workflows may overlap even in the same output directory because
+each result has its own name. The same workflow cannot overlap while its named
+workspace contains tabs. A short-lived file lock prevents competing workspace
+checks; after creation, the live tab keeps the workspace busy. The lock is
+released on return or process exit, so its file's existence is not a retained
+reservation. Failed or incomplete runs keep their tabs for inspection. Close
+the retained tab only after inspecting and stopping unfinished work, then retry.
+No placeholder terminal is added to keep an empty workspace alive.
+
+`exclusive_paths` also declares exact shared-file resources that require
+exclusive use across different workflows, not directory trees. Every workflow
+using a shared mutable file must declare the same resolved resource. Files need
+not exist yet; existing directory paths are rejected. Reservations do not grant
+permission to modify the resource or
 technically prevent undeclared writes.
 
 Before session startup, Tejun atomically creates reservation files under its
@@ -211,7 +248,7 @@ local state directory, keyed by the resolved resource paths. Each records its
 owning run and status path. An existing reservation rejects a conflicting run
 with an actionable diagnostic. Acquiring several resources does not wait for
 busy ones; a pre-agent failure releases only reservations owned by that run.
-Runs with distinct resources remain independent.
+Different workflows with distinct resources remain independent.
 
 The worker releases reservations after confirmed Pi exit, including when final
 publication fails. Before agent startup has been attempted, a launch failure

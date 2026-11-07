@@ -39,6 +39,11 @@ launcher, and obtain agreement before implementing the dependent delivery slice.
 
 ## Accepted contract
 
+This records the discovery agreement. The user-approved delivery amendments in
+[S007](S007-cross-project-review-workflow.md#review) supersede the original
+report headings, workspace/overlap behaviour, and changed-decision verification
+requirement. The other discovery rules remain in effect.
+
 ### Coverage and inspection
 
 - Review immediate project directories under `~/dev/clients` and

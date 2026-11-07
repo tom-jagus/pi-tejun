@@ -1,6 +1,6 @@
 ---
 id: B002
-status: In progress
+status: Review
 ---
 
 # Cross-project review
@@ -29,6 +29,8 @@ This is advisory cross-project work, not acceptance review or authorization
 to implement findings. Do not automatically change project status, add backlog
 items, or create a duplicate project-state database. Preserve distinctions
 between existing commitments, new suggestions, and the user's decisions.
+Decision capture and implementation of recommendations are outside this brief;
+existing project-local records are evidence, not a report-side decision store.
 
 ## Acceptance criteria
 
@@ -53,11 +55,15 @@ contract, including roots, exclusions, client-first ordering, concise report
 format, documentation-only inspection, and the verification plan. The user
 accepted closing discovery and authorized S007 implementation.
 
-[S007](S007-cross-project-review-workflow.md) delivers the workflow through the
-existing launcher. Pi follows workflow-owned instructions; shared code adds
-only the necessary generated-report validation, preserving existing exact-text
-checks. Separate project scanners, decision stores, and general frameworks are
-not required. Scheduled and event-triggered execution remains B007 work.
+[S007](S007-cross-project-review-workflow.md) is accepted and delivers the
+`project-review` workflow through the existing launcher. Pi follows
+workflow-owned instructions; shared code adds the necessary generated-report
+validation and workspace isolation, preserving existing exact-text checks.
+Separate project scanners, decision stores, and general frameworks are not
+required. Scheduled and event-triggered execution remains B007 work.
 
-Brief acceptance will assess the combined result against the criteria above,
-not infer success from completed slices or structural validation alone.
+## Review
+
+Both delivery slices are accepted. B002 is ready for its separate outcome-level
+assessment against the criteria above. Slice completion, successful execution,
+and structural validation do not automatically accept the brief.

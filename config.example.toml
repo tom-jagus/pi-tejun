@@ -14,3 +14,12 @@ timeout_seconds = 300
 
 [paths]
 verification = "/absolute/path/to/pi-tejun/verification"
+
+# Project-review configuration. Verify these machine-specific paths before use.
+# The three roots and output workspace must exist; excluded folders need not.
+project_directions = "~/dev/default/_projects-directions"
+client_projects = "~/dev/clients"
+personal_projects = "~/dev/default"
+personal_repositories = "~/src/default"
+content_production = "~/dev/default/content-production"
+# Keep enabled unchanged unless bare `tejun run` should also run the review.

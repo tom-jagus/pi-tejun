@@ -44,28 +44,28 @@ class LauncherTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp, patch.object(tejun, "STATE", Path(temp)), \
              patch.object(tejun, "herdr", return_value={"workspaces": [{"workspace_id": "w7"}]}) as herdr, \
              patch.object(tejun.subprocess, "Popen") as popen:
-            self.assertEqual(tejun.ensure_session("herdr", Path("/tmp")), "w7")
+            self.assertEqual(tejun.ensure_session("herdr", Path("/tmp")), [{"workspace_id": "w7"}])
             popen.assert_not_called()
             herdr.assert_called_once_with("herdr", "workspace", "list")
 
-    def test_session_starts_detached_waits_and_creates_workspace_if_empty(self):
+    def test_session_starts_detached_without_creating_a_shared_workspace(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             replies = [tejun.HerdrNotRunning("missing"), tejun.HerdrNotRunning("starting"),
-                       {"workspaces": []}, {"workspace": {"workspace_id": "w9"}}]
+                       {"workspaces": []}]
             with patch.object(tejun, "STATE", root / "state"), \
                  patch.object(tejun, "herdr", side_effect=replies) as herdr, \
                  patch.object(tejun.subprocess, "Popen") as popen, \
                  patch.object(tejun.time, "sleep"):
                 popen.return_value.poll.return_value = None
-                self.assertEqual(tejun.ensure_session("herdr", root), "w9")
+                self.assertEqual(tejun.ensure_session("herdr", root), [])
                 self.assertEqual(popen.call_args.args[0], ["herdr", "--session", "tejun", "server"])
                 self.assertTrue(popen.call_args.kwargs["start_new_session"])
                 self.assertEqual(popen.call_args.kwargs["stdin"], subprocess.DEVNULL)
                 self.assertEqual(popen.call_args.kwargs["cwd"], root)
-                self.assertEqual(herdr.call_args.args,
-                                 ("herdr", "workspace", "create", "--cwd", str(root),
-                                  "--label", "tejun", "--no-focus"))
+                self.assertEqual(herdr.call_args.args, ("herdr", "workspace", "list"))
+                self.assertFalse(any(call.args[1:3] == ("workspace", "create")
+                                     for call in herdr.call_args_list))
                 self.assertTrue((root / "state/herdr-server.log").is_file())
 
     def test_session_reports_early_exit_and_readiness_timeout(self):
@@ -227,9 +227,10 @@ class LauncherTests(unittest.TestCase):
                         "workspace_id": "w1", "workspace": str(root),
                         "agent_dir": str(root), "path": "/fixture/bin", "input": str(root / "input.md"),
                         "pi_args": [], "provider": "openai", "model": "exact-id"}
-            tab = {"root_pane": {"pane_id": "w1:p99"}, "tab": {"tab_id": "w1:t99"}}
+            tab = {"workspace": {"workspace_id": "w1"},
+                   "root_pane": {"pane_id": "w1:p99"}, "tab": {"tab_id": "w1:t99"}}
             with patch.object(tejun, "STATE", root / "state"), \
-                 patch.object(tejun, "ensure_session", return_value="w1"), \
+                 patch.object(tejun, "ensure_session", return_value=[]), \
                  patch.object(tejun, "herdr", return_value=tab) as herdr, \
                  patch.object(tejun.subprocess, "Popen") as popen, \
                  redirect_stdout(io.StringIO()) as output:

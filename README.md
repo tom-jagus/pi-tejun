@@ -59,8 +59,8 @@ operations, or publication.
 You need Python 3.11 or newer, `pi` and `herdr` on `PATH`, an activated Kijun
 agent directory, and working Pi credentials. The configured agent directory
 must contain `AGENTS.md` and `extensions/herdr-agent-state.ts`; the `verify`
-workflow also needs the `unslop` skill. The current setup was checked with
-Pi 1.5.0 and Herdr 0.9.1.
+and `project-review` workflows also need the `unslop` skill. The current setup
+was checked with Pi 1.5.0 and Herdr 0.9.1.
 
 From this repository, install the user-level command:
 
@@ -105,7 +105,8 @@ tejun list
 tejun run content-smoke-test
 ```
 
-Tejun starts or reuses a dedicated headless Herdr session named `tejun`. It
+Tejun starts or reuses a dedicated headless Herdr session named `tejun`. Each
+workflow gets a workspace labelled with its name and a default-named tab. It
 creates fresh Pi TUI agents without attaching or changing your terminal's
 focus. Launch acknowledgement waits for startup, not for the workflow to finish.
 
@@ -115,6 +116,7 @@ focus. Launch acknowledgement waits for startup, not for the workflow to finish.
 tejun list
 tejun run content-smoke-test
 tejun run verify
+tejun run project-review
 tejun run
 ```
 
@@ -140,8 +142,8 @@ confirms completion. A missing final outcome is unconfirmed work, not success.
 `TEJUN_CONFIG` and `TEJUN_STATE_DIR` can override the local config and state paths.
 
 Output names include the workflow and a unique run identifier. The launcher
-reserves a new, empty `.partial.md` file before starting Pi. After exact-content
-validation and confirmed Pi exit, it publishes the final `.md` file without
+reserves a new, empty `.partial.md` file before starting Pi. After the declared
+result check and confirmed Pi exit, it publishes the final `.md` file without
 replacing any existing name, then removes the partial name. Publication uses
 an atomic hard link in the same directory, so the destination filesystem must
 support hard links. Existing run records and partial files are also preserved.
@@ -168,6 +170,58 @@ newly completed result. The launcher does not accept results or authorize
 source changes, Git work, or publication. Workflow instructions are not
 filesystem or network access controls.
 
+## Project review
+
+`project-review` reads project documentation and suggests next actions. Add
+these entries to the existing `[paths]` table in your local configuration:
+
+```toml
+project_directions = "~/dev/default/_projects-directions"
+client_projects = "~/dev/clients"
+personal_projects = "~/dev/default"
+personal_repositories = "~/src/default"
+```
+
+Keep the `content_production` entry from setup; that folder and the report
+workspace are explicit exclusions. Verify all paths before running. The three
+roots and report destination must already exist. Create the destination if
+needed, then invoke the named workflow:
+
+```sh
+mkdir -p ~/dev/default/_projects-directions
+tejun run project-review
+```
+
+Existing installations retain their configuration, so editing
+`config.example.toml` or reinstalling does not add these keys to your live file.
+Named invocation does not require changing `enabled`. The workflow uses local
+Pi model, thinking, and timeout defaults.
+
+The review includes immediate projects under the client and personal project
+roots. The personal repository root includes only repositories with non-Done
+briefs, including Draft. Missing or legacy records under the project roots need
+attention rather than automatic migration. Paused projects remain visible.
+
+Reports put clients before personal projects, then blockers and work awaiting
+input or review before quick wins and other unfinished work. Within each
+category, projects sort oldest first by their newest work-record modification
+time, including Done records. This measures filesystem recency, not meaningful
+activity. Unavailable dates follow known dates. Each project appears once with
+a date and two short bullets identifying the issue and next action.
+
+The report has a dated title, project-group headings, category headings, and
+project-path headings. Structural validation checks this format, configured
+path membership, duplicates, dates, visible ordering, and brevity. It does not
+prove complete discovery, correct classification, or useful recommendations.
+Inspect reports before acting on them. No decision-capture or implementation
+step is included. Existing project records remain authoritative.
+
+The workflow may list directories, inspect timestamps, read instructions and
+project documentation, and write its current result. It must not inspect
+source, run project tests, change projects, or perform Git work. Its tools are
+not a read-only sandbox. Unreadable roots reject the run rather than imply an
+empty group; inaccessible project records must remain visible as uncertainty.
+
 ## History and overlapping runs
 
 Every run starts a fresh Pi conversation with explicitly selected resources.
@@ -177,8 +231,18 @@ files. The launcher checks that they are readable and includes their resolved
 paths in the prompt for Pi to read as data. It does not decide what the history
 means, maintain a digest index, or update domain decisions.
 
-Runs that write only their unique result files can overlap, including in the
-same directory. A workflow that shares mutable files must declare their exact,
+Different workflows can overlap, including when writing unique reports in the
+same directory. A second run of the same workflow is rejected while its named
+workspace contains any tabs. An atomic per-workflow lock protects the workspace
+check and tab creation. Failed runs retain their tab for inspection; close that
+tab before retrying. Do not close an active run merely to bypass this check.
+
+Successful runs close only their unchanged Pi tab. Herdr removes a workspace
+when its last tab closes, so the next run recreates it. If other tabs remain,
+the workspace remains and blocks another run. Existing unrelated workspaces
+and the earlier shared `tejun` workspace are not migrated or closed.
+
+A workflow that shares mutable files must also declare their exact,
 workspace-relative paths in `exclusive_paths`. All workflows using the same
 shared mutable file must declare it consistently. These are file reservations,
 not directory-tree locks or restrictions on tool access. Their complete rules
@@ -213,17 +277,17 @@ contact a model provider.
 
 B001 and its slices S001 through S005 are complete. Manual discovery,
 installation, background execution, failure handling, repeatability, and
-shared-file coordination are implemented. The user verified the S002 smoke test inside and
-outside this repository; S003/S004 add credential-free failure and concurrency
-checks. S005 adds installed-command checks for both definitions, a tested
-workflow-authoring example, and combined B001 verification evidence. Both S005
-and B001 passed the user-delegated acceptance review. The runner currently
-validates exact-content Markdown only. Scheduled execution and domain workflows
-are not implemented.
+shared-file coordination are implemented and accepted.
+
+S006 and S007 deliver the accepted `project-review` workflow, specific generated
+report validation, and per-workflow workspace isolation. Acceptance includes
+successful saved live runs and the user's manual observations; structural tests
+are not proof of model compliance. B002 awaits its separate brief-level review.
+Scheduled execution and the other proposed domain workflows remain unimplemented.
 
 - [Workflow authoring](docs/workflow-authoring.md) explains supported definition
-  fields, local configuration, exact-result validation, and adding a workflow
-  through the existing command.
+  fields, local configuration, exact and generated-result checks, and adding a
+  workflow through the existing command.
 - [B001 verification evidence](docs/b001-verification.md) maps manual invocation
   behavior and reproducible checks to all six brief acceptance criteria.
 - [Project charter](docs/project/charter.md) defines the purpose and boundaries.

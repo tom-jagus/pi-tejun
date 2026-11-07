@@ -129,12 +129,26 @@ def validate_definition(item, label):
     for name in item["skills"]:
         if not re.fullmatch(r"[a-z][a-z0-9-]*", name):
             raise TejunError(f"Invalid skill name in {label}: {name!r}")
-    if ("input" in item) == ("result_text" in item):
-        raise TejunError(f"{label} must declare exactly one of input or result_text.")
-    text_field(item, "input" if "input" in item else "result_text", label)
+    check = item.get("result_check", "exact")
+    if not isinstance(check, str) or check not in {"exact", "project-review"}:
+        raise TejunError(f"Unsupported result_check in {label}: {check!r}")
+    if check == "exact":
+        if ("input" in item) == ("result_text" in item):
+            raise TejunError(f"{label} must declare exactly one of input or result_text.")
+        text_field(item, "input" if "input" in item else "result_text", label)
+    else:
+        if "input" in item or "result_text" in item:
+            raise TejunError(f"{label}: project-review uses context_paths, not input/result_text.")
+        if string_list(item, "context_paths", label) != [
+                "client_projects", "personal_projects", "personal_repositories"]:
+            raise TejunError(f"{label}.context_paths must declare the three project-review roots.")
+        string_list(item, "excluded_paths", label)
+        if not {"read", "write", "bash"}.issubset(item["tools"]):
+            raise TejunError(f"{label}: project-review requires read, write, and bash tools.")
     for key in ("history_inputs", "exclusive_paths"):
         string_list(item, key, label, default=[])
-    fields = {"input_path", "output_path", "heading", "result_text"}
+    fields = {"input_path", "output_path", "heading", "result_text",
+              "context_paths", "excluded_paths"}
     try:
         for _, field, spec, conversion in Formatter().parse(item["prompt"]):
             if field is not None and (field not in fields or spec or conversion):
@@ -185,7 +199,7 @@ def herdr(binary, *args, timeout=30):
 
 
 def ensure_session(binary, workspace):
-    """Reuse Tejun's session; serialize only server/workspace initialization."""
+    """Start/reuse Tejun's server without creating a shared workspace."""
     STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
     with (STATE / "session.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
@@ -212,11 +226,46 @@ def ensure_session(binary, workspace):
                         raise TejunError(
                             f"Timed out starting Herdr session '{SESSION}'. See {log_path}.")
                     time.sleep(0.1)
-        if not workspaces:
-            created = herdr(binary, "workspace", "create", "--cwd", str(workspace),
-                            "--label", SESSION, "--no-focus")
-            return created["workspace"]["workspace_id"]
-        return workspaces[0]["workspace_id"]
+        return workspaces
+
+
+def reserve_workflow_tab(workflow, prepared, run_dir, status):
+    """Serialize the live workspace check and tab reservation across launchers."""
+    directory = STATE / "workflow-locks"
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    name, binary = workflow["name"], prepared["herdr"]
+    with (directory / f"{name}.lock").open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise TejunError(f"Workflow '{name}' is already starting; try again later.") from error
+        workspaces = ensure_session(binary, Path(prepared["workspace"]))
+        matches = [item for item in workspaces if item.get("label") == name]
+        if len(matches) > 1:
+            raise TejunError(f"Multiple workspaces named '{name}'; resolve the ambiguity before running.")
+        options = ["--cwd", prepared["workspace"], "--no-focus",
+                   "--env", f"PI_CODING_AGENT_DIR={prepared['agent_dir']}",
+                   "--env", f"PATH={prepared['path']}",
+                   "--env", f"TEJUN_EXPECTED_PROVIDER={prepared['provider']}",
+                   "--env", f"TEJUN_EXPECTED_MODEL={prepared['model']}",
+                   "--env", f"TEJUN_ERROR_FILE={run_dir / 'pi-error.txt'}"]
+        workspace_id = None
+        if matches:
+            workspace_id = matches[0]["workspace_id"]
+            tabs = herdr(binary, "tab", "list", "--workspace", workspace_id)["tabs"]
+            if tabs:
+                raise TejunError(
+                    f"Workflow '{name}' workspace {workspace_id} still has tabs. "
+                    "Wait for completion or close the retained tab after inspection.")
+        with defer_interrupts():
+            if workspace_id is None:
+                created = herdr(binary, "workspace", "create", "--label", name, *options)
+                workspace_id = created["workspace"]["workspace_id"]
+            else:
+                created = herdr(binary, "tab", "create", "--workspace", workspace_id, *options)
+            status.update(workspace_id=workspace_id, pane=created["root_pane"]["pane_id"],
+                          tab=created["tab"]["tab_id"])
+            save_status(run_dir, status)
 
 
 def save_status(run_dir, status):
@@ -233,9 +282,28 @@ def prepare(workflow, config):
     if not workspace.is_dir():
         raise TejunError(f"Missing workflow directory: {workspace}")
     source = relative(workspace, workflow["input"]) if "input" in workflow else None
-    text = read_text(source, "workflow input") if source else workflow["result_text"]
-    if not isinstance(text, str) or not text.strip():
-        raise TejunError(f"Workflow input or result_text is empty or invalid: {source or workflow['name']}")
+    check = workflow.get("result_check", "exact")
+    text = read_text(source, "workflow input") if source else workflow.get("result_text", "")
+    context, exclusions = {}, []
+    if check == "exact":
+        if not isinstance(text, str) or not text.strip():
+            raise TejunError(f"Workflow input or result_text is empty or invalid: {source or workflow['name']}")
+    else:
+        for key in workflow["context_paths"]:
+            root = absolute(text_field(paths, key, f"{CONFIG}.paths"))
+            if not root.is_dir():
+                raise TejunError(f"Missing project-review root: {root}")
+            try:
+                with os.scandir(root):
+                    pass  # Check root access, not project discovery or eligibility.
+            except OSError as error:
+                raise TejunError(f"Cannot list project-review root {root}: {error}") from error
+            context[key] = str(root)
+        if len(set(context.values())) != len(context):
+            raise TejunError("Project-review roots must be distinct.")
+        exclusions = sorted({str(workspace), *(
+            str(absolute(text_field(paths, key, f"{CONFIG}.paths")))
+            for key in workflow["excluded_paths"])})
     output_dir = relative(workspace, workflow["output_dir"], allow_root=True)
     if output_dir.exists() and not output_dir.is_dir():
         raise TejunError(f"Output directory is not a directory: {output_dir}")
@@ -290,7 +358,8 @@ def prepare(workflow, config):
     # Pi resolves the model and authenticates during the actual workflow.
     # The in-process extension prevents fuzzy model substitution before input.
     return {"workspace": str(workspace), "input": str(source) if source else None, "output_dir": str(output_dir),
-            "expected": workflow["heading"] + "\n\n" + text.rstrip("\n") + "\n",
+            "expected": workflow["heading"] + "\n\n" + text.rstrip("\n") + "\n" if check == "exact" else None,
+            "result_check": check, "context_paths": context, "excluded_paths": exclusions,
             "history_inputs": list(map(str, history)), "exclusive_paths": exclusive,
             "agent_dir": str(agent_dir), "pi_args": args, "herdr": binary,
             "provider": provider, "model": model,
@@ -382,20 +451,13 @@ def launch(workflow, prepared):
                 pass
         except FileExistsError as error:
             raise TejunError(f"Refusing to replace existing partial output: {partial}") from error
-        workspace_id = ensure_session(prepared["herdr"], Path(prepared["workspace"]))
-        tab = herdr(prepared["herdr"], "tab", "create", "--workspace", workspace_id,
-                    "--cwd", prepared["workspace"], "--label", f"tejun-{workflow['name']}",
-                    "--no-focus", "--env", f"PI_CODING_AGENT_DIR={prepared['agent_dir']}",
-                    "--env", f"PATH={prepared['path']}",
-                    "--env", f"TEJUN_EXPECTED_PROVIDER={prepared['provider']}",
-                    "--env", f"TEJUN_EXPECTED_MODEL={prepared['model']}",
-                    "--env", f"TEJUN_ERROR_FILE={run_dir / 'pi-error.txt'}")
-        status.update(pane=tab["root_pane"]["pane_id"], tab=tab["tab"]["tab_id"])
-        save_status(run_dir, status)
+        reserve_workflow_tab(workflow, prepared, run_dir, status)
         prompt = workflow["prompt"].format(input_path=json.dumps(prepared["input"]),
                                            output_path=json.dumps(str(partial)),
                                            heading=workflow["heading"],
-                                           result_text=workflow.get("result_text", "").rstrip("\n"))
+                                           result_text=workflow.get("result_text", "").rstrip("\n"),
+                                           context_paths=json.dumps(prepared.get("context_paths", {})),
+                                           excluded_paths=json.dumps(prepared.get("excluded_paths", [])))
         history = prepared.get("history_inputs", [])
         prompt += ("\n\nHistory policy: start a fresh conversation. Only the declared workflow "
                    "inputs and history files are history; do not resume sessions or search "
@@ -468,6 +530,116 @@ def load_json(path):
         raise TejunError(f"Invalid run record {path}: {error}") from error
 
 
+def validate_project_report(text, request):
+    """Check the visible report contract, not discovery completeness or judgment."""
+    def reject(reason):
+        raise TejunError(f"Invalid project review: {reason}")
+
+    if not text.endswith("\n") or "\r" in text or "\x00" in text or "```" in text:
+        reject("use plain UTF-8 Markdown with a final newline, without code fences.")
+    title = text.partition("\n")[0]
+    prefix = "# Project review - "
+    if not title.startswith(prefix) or re.findall(r"^# .+$", text, re.MULTILINE) != [title]:
+        reject("start with one dated title: # Project review - Saturday November 7, 2026.")
+    try:
+        day = datetime.strptime(title.removeprefix(prefix), "%A %B %d, %Y")
+    except ValueError:
+        reject("title date must use the weekday and Month day, year format.")
+    canonical = f"{prefix}{day:%A %B} {day.day}, {day.year:04d}"
+    if title != canonical:
+        reject("title needs the correct weekday, full month name, and unpadded day.")
+    body = text.partition("\n")[2]
+    headings = re.findall(r"^## (.+)$", body, re.MULTILINE)
+    if headings not in (["Client projects", "Personal projects"],
+                        ["Client projects", "Personal projects", "Summary"]):
+        reject("expected Client projects, Personal projects, and optional Summary, in order.")
+    sections = re.split(r"^## .+\n", body, flags=re.MULTILINE)
+    if sections.pop(0).strip():
+        reject("no preamble is allowed between the title and Client projects.")
+    if len(sections) != len(headings):
+        reject("malformed top-level sections.")
+    categories = ["Blocked or awaiting input", "Quick wins", "Other unfinished work"]
+    roots = request["context_paths"]
+    excluded = {Path(value) for value in request.get("excluded_paths", [])}
+    seen = set()
+    for index, body in enumerate(sections[:2]):
+        empty = "No client projects found." if index == 0 else "No personal projects found."
+        if body.strip() == empty:
+            continue
+        parts = re.split(r"^### (.+)\n", body, flags=re.MULTILINE)
+        if parts[0].strip() or len(parts) < 3:
+            reject("groups must contain category sections or the explicit empty-group sentence.")
+        previous_category = -1
+        for offset in range(1, len(parts), 2):
+            category, content = parts[offset:offset + 2]
+            if category not in categories or categories.index(category) <= previous_category:
+                reject("categories must be unique and ordered: blockers, quick wins, other work.")
+            previous_category = categories.index(category)
+            entries = re.split(r"^#### (.+)\n", content, flags=re.MULTILINE)
+            if entries[0].strip() or len(entries) < 3:
+                reject("each nonempty category needs project path headings.")
+            previous_date = ""
+            unknown_seen = False
+            previous_unknown_name = ""
+            for position in range(1, len(entries), 2):
+                display, entry = entries[position:position + 2]
+                if display.strip() != display or not display.startswith(("/", "~/")):
+                    reject("project headings must be absolute or home-relative paths.")
+                try:
+                    path = Path(display).expanduser().resolve()
+                except (OSError, RuntimeError, ValueError) as error:
+                    reject(f"cannot resolve project path {display}: {error}")
+                allowed = [roots["client_projects"]] if index == 0 else [
+                    roots["personal_projects"], roots["personal_repositories"]]
+                if path.parent not in {Path(root) for root in allowed} or path in excluded:
+                    reject(f"project path is outside its configured group or excluded: {display}")
+                if path in seen:
+                    reject(f"duplicate project: {display}")
+                seen.add(path)
+                lines = [line for line in entry.splitlines() if line.strip()]
+                if not lines or not lines[0].startswith("last modified: "):
+                    reject(f"missing last modified date for {display}")
+                modified = lines[0].removeprefix("last modified: ")
+                if modified == "unavailable":
+                    if previous_category != 0:
+                        reject("an unavailable date belongs in the documentation/input attention section.")
+                    name = (path.name.casefold(), str(path))
+                    if previous_unknown_name and name < previous_unknown_name:
+                        reject("projects with unavailable dates must be ordered by name.")
+                    previous_unknown_name = name
+                    unknown_seen = True
+                else:
+                    try:
+                        if datetime.strptime(modified, "%Y-%m-%d").strftime("%Y-%m-%d") != modified:
+                            raise ValueError("non-canonical date")
+                    except ValueError:
+                        reject(f"invalid last modified date for {display}")
+                    if unknown_seen or modified < previous_date:
+                        reject("known dates must be oldest first, before unavailable dates.")
+                    previous_date = modified
+                bullets = []
+                for line in lines[1:]:
+                    if line.startswith("- "):
+                        bullets.append(line[2:])
+                    elif line.startswith("  ") and bullets:
+                        if re.match(r"(?:[-+*]\s|#{1,6}\s|\d+[.)]\s|>)", line.strip()):
+                            reject("nested lists, headings, and quotations are not bullet continuations.")
+                        bullets[-1] += " " + line.strip()
+                    else:
+                        reject(f"unexpected project detail for {display}; use only two bullets.")
+                if len(bullets) != 2 or any(not 1 <= len(bullet.split()) <= 40 for bullet in bullets):
+                    reject(f"{display} needs exactly two short bullets, at most 40 words each.")
+                if any(re.match(r"(?:reason|suggested next action|evidence|outcome):", bullet, re.I)
+                       for bullet in bullets):
+                    reject("omit bullet labels, evidence lists, and outcome paragraphs.")
+                if any(re.search(r"\[[^\]]*\]\([^)]*\)", bullet) for bullet in bullets):
+                    reject("use concise item references rather than source links.")
+    if len(sections) == 3:
+        summary = sections[2].strip()
+        if not summary or len(summary.split()) > 70 or re.search(r"^\s*(?:#|- )", summary, re.MULTILINE):
+            reject("Summary must be a short paragraph of at most 70 words.")
+
+
 def worker(run_dir):
     status = load_json(run_dir / "status.json")
     exit_code = 1
@@ -484,9 +656,15 @@ def worker(run_dir):
         if state not in {"idle", "done"}:
             raise TejunError(f"Agent settled as {state}; left open in {status['pane']}.")
         partial = Path(status["partial"])
-        if (partial.is_symlink() or not partial.is_file()
-                or partial.read_bytes() != request["expected"].encode("utf-8")):
+        if partial.is_symlink() or not partial.is_file():
             raise TejunError(f"Expected Markdown was not produced; agent left open in {status['pane']}.")
+        if request.get("result_check", "exact") == "project-review":
+            validate_project_report(read_text(partial, "project review"), request)
+        elif request.get("result_check", "exact") == "exact":
+            if partial.read_bytes() != request["expected"].encode("utf-8"):
+                raise TejunError(f"Expected Markdown was not produced; agent left open in {status['pane']}.")
+        else:
+            raise TejunError("Unsupported result check in run request.")
         herdr(binary, "agent", "send-keys", name, "ctrl+d")
         deadline = time.monotonic() + 10
         while True:

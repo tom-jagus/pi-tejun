@@ -48,7 +48,7 @@ class IsolationTests(unittest.TestCase):
                 self.assertEqual(old.read_text(), "Earlier result\n")
                 self.assertTrue(fixture.partial.exists())
 
-    def test_overlapping_unique_output_runs_have_fresh_panes_and_preserve_results(self):
+    def test_different_workflows_overlap_in_separate_workspaces_and_preserve_results(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             reports = root / "reports"
@@ -57,23 +57,25 @@ class IsolationTests(unittest.TestCase):
             old.write_text("Keep this\n")
             tabs = []
             def herdr(binary, *args, **kwargs):
-                if args[:2] == ("tab", "create"):
+                if args[:2] == ("workspace", "create"):
                     n = len(tabs) + 1
                     tabs.append(n)
-                    return {"root_pane": {"pane_id": f"w1:p{n}"}, "tab": {"tab_id": f"w1:t{n}"}}
+                    return {"workspace": {"workspace_id": f"w{n}"},
+                            "root_pane": {"pane_id": f"w{n}:p1"}, "tab": {"tab_id": f"w{n}:t1"}}
                 return {}
             with patch.object(tejun, "STATE", root / "state"), \
-                 patch.object(tejun, "ensure_session", return_value="w1"), \
+                 patch.object(tejun, "ensure_session", return_value=[]), \
                  patch.object(tejun, "herdr", side_effect=herdr) as calls, \
                  patch.object(tejun.subprocess, "Popen"), redirect_stdout(io.StringIO()):
-                tejun.launch(workflow(), prepared(root))
-                tejun.launch(workflow(), prepared(root))
+                tejun.launch({**workflow(), "name": "fixture-one"}, prepared(root))
+                tejun.launch({**workflow(), "name": "fixture-two"}, prepared(root))
             runs = sorted((root / "state/runs").iterdir())
             statuses = [json.loads((run / "status.json").read_text()) for run in runs]
             requests = [json.loads((run / "request.json").read_text()) for run in runs]
             self.assertEqual(len(runs), 2)
             self.assertEqual(len({s["output"] for s in statuses}), 2)
             self.assertEqual(len({s["pane"] for s in statuses}), 2)
+            self.assertEqual(len({s["workspace_id"] for s in statuses}), 2)
             self.assertEqual(len({r["name"] for r in requests}), 2)
             self.assertTrue(all(s["state"] == "started" for s in statuses))
             self.assertTrue(all("--no-session" in r["pi_args"] for r in requests))
@@ -139,9 +141,10 @@ class IsolationTests(unittest.TestCase):
                 self.assertNotIn("--resume", request["pi_args"])
                 self.assertNotIn("--continue", request["pi_args"])
                 self.assertNotIn("unrelated.md", json.dumps(request))
-                tab = {"root_pane": {"pane_id": "w1:p9"}, "tab": {"tab_id": "w1:t9"}}
+                tab = {"workspace": {"workspace_id": "w1"},
+                       "root_pane": {"pane_id": "w1:p9"}, "tab": {"tab_id": "w1:t9"}}
                 with patch.object(tejun, "STATE", root / "state"), \
-                     patch.object(tejun, "ensure_session", return_value="w1"), \
+                     patch.object(tejun, "ensure_session", return_value=[]), \
                      patch.object(tejun, "herdr", return_value=tab), \
                      patch.object(tejun.subprocess, "Popen"), redirect_stdout(io.StringIO()):
                     tejun.launch(definition, request)
@@ -242,7 +245,7 @@ class IsolationTests(unittest.TestCase):
                 " time.sleep(0.1);(root/'ready').write_text('ready')\n"
                 " return types.SimpleNamespace(poll=lambda:None)\n"
                 "t.herdr=herdr;t.subprocess.Popen=start\n"
-                "assert t.ensure_session('fixture',root)=='w1'\n")
+                "assert t.ensure_session('fixture',root)==[{'workspace_id':'w1'}]\n")
             children = [subprocess.Popen([sys.executable, str(script)],
                                          env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
                                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -300,11 +303,12 @@ class IsolationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             def fail_start(binary, *args, **kwargs):
-                if args[:2] == ("tab", "create"):
-                    return {"root_pane": {"pane_id": "w1:p9"}, "tab": {"tab_id": "w1:t9"}}
+                if args[:2] == ("workspace", "create"):
+                    return {"workspace": {"workspace_id": "w1"},
+                            "root_pane": {"pane_id": "w1:p9"}, "tab": {"tab_id": "w1:t9"}}
                 raise tejun.TejunError("startup could have left an agent")
             with patch.object(tejun, "STATE", root / "state"), \
-                 patch.object(tejun, "ensure_session", return_value="w1"), \
+                 patch.object(tejun, "ensure_session", return_value=[]), \
                  patch.object(tejun, "herdr", side_effect=fail_start):
                 with self.assertRaisesRegex(tejun.TejunError, "startup could have left"):
                     tejun.launch(workflow(), prepared(root, exclusive_paths=[str(root / "coverage.md")]))
