@@ -89,6 +89,31 @@ class LauncherTests(unittest.TestCase):
                 tejun.ensure_session("herdr", Path("/tmp"))
             popen.assert_not_called()
 
+    def test_runner_and_installer_share_config_default_and_override(self):
+        with tempfile.TemporaryDirectory() as temp, redirect_stdout(io.StringIO()):
+            home = Path(temp)
+            agent = home / ".pi/agent"
+            agent.mkdir(parents=True)
+            (agent / "settings.json").write_text(json.dumps({
+                "defaultProvider": "fixture", "defaultModel": "exact-id",
+                "defaultThinkingLevel": "off"}))
+            for override in (None, str(home / "custom/config.toml")):
+                env = {"HOME": str(home)}
+                if override:
+                    env["TEJUN_CONFIG"] = override
+                expected = Path(override) if override else home / ".config/pi-tejun/config.toml"
+                with patch.dict(os.environ, env, clear=True), \
+                     patch("sys.argv", ["install.py"]), \
+                     patch.object(installer.shutil, "which", return_value=None):
+                    installer.main()
+                    runner = module("config_probe", ROOT / "tejun.py")
+                    self.assertEqual(runner.CONFIG, expected)
+                    self.assertEqual(runner.load_toml(expected)["pi"]["model"], "exact-id")
+                    self.assertFalse((home / ".local/share/pi-tejun/config.toml").exists())
+                    original = expected.read_bytes()
+                    installer.main()
+                    self.assertEqual(expected.read_bytes(), original)
+
     def test_install_is_repeatable_and_preserves_collisions(self):
         with tempfile.TemporaryDirectory() as temp, redirect_stdout(io.StringIO()):
             root = Path(temp)

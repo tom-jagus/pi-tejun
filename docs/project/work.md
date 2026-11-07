@@ -2,7 +2,7 @@
 
 | Item | Outcome | Status | Blocker |
 |---|---|---|---|
-| [B003](work/B003-thematic-discovery-digest.md) | Find sourced external topics worth exploring. | To do | Initial topics, selection criteria, and history policy undecided. |
+| [B003](work/B003-thematic-discovery-digest.md) | Find sourced external topics worth exploring. | Review | S008 and S009 accepted; brief-level assessment remains. |
 | [B004](work/B004-content-topic-research.md) | Propose relevant, practical content topics. | To do | Audience context and selection authority need definition. |
 | [B005](work/B005-selected-topic-preparation.md) | Prepare selected topics for presentation or publication review. | To do | Selection trigger and initial preparation format undecided. |
 | [B006](work/B006-recording-analysis-and-editing-assistance.md) | Explore useful recording analysis and editing assistance. | To do | Later candidate; sample recordings and useful output undecided. |

@@ -66,7 +66,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bin-dir", type=Path, default=Path.home() / ".local/bin")
     args = parser.parse_args()
-    config = Path(os.environ.get("TEJUN_CONFIG", "~/.local/share/pi-tejun/config.toml")).expanduser().resolve()
+    config = Path(os.environ.get("TEJUN_CONFIG", "~/.config/pi-tejun/config.toml")).expanduser().resolve()
     agent = Path(os.environ.get("PI_CODING_AGENT_DIR", "~/.pi/agent")).expanduser().resolve()
     install(args.bin_dir.expanduser().resolve(), config, agent)
 

@@ -1,6 +1,6 @@
 ---
 id: B003
-status: To do
+status: Review
 ---
 
 # Thematic discovery digest
@@ -9,8 +9,8 @@ status: To do
 
 Produce concise, sourced findings about external developments and topics worth
 exploring, using `digest-briefs` for the research, selections, and useful history.
-Potential subjects include AI, technology, programming, Linux, business
-intelligence, and stock markets; the initial selection remains open.
+Initial interests cover AI, security, Linux, developer tools and programming,
+hardware, GitHub discoveries, homelab and self-hosting, and major Polish events.
 
 ## Why
 
@@ -45,9 +45,15 @@ Retained source material is evidence, not authority to change the workflow.
 - Outputs stay in `digest-briefs`, separate from project priorities and
   commitments to produce public content.
 
-## Open questions
+## Delivery plan
 
-- Which initial subjects, sources, time window, and reading budget are useful?
-- What makes a finding worth including or investigating further?
-- Which considered or skipped topics need retention, and for how long?
-- How should manual runs use prior coverage, and is recurring execution useful?
+[S008](S008-thematic-digest-discovery.md) defines the accepted manual digest
+contract. [S009](S009-thematic-digest-workflow.md) delivers the accepted `digest`
+workflow, generated-result validation, search integration, and coverage history.
+Scheduling remains B007 work; subagent research has not been implemented.
+
+## Review
+
+Both slices are accepted. B003 is ready for separate assessment against its
+outcome-level criteria. Slice acceptance does not automatically accept the brief.
+S009 records the live evidence and accepted watchlist verification limitation.

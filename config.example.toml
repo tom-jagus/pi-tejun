@@ -1,4 +1,4 @@
-# Copy to ~/.local/share/pi-tejun/config.toml, or run python3 install.py.
+# Copy to ~/.config/pi-tejun/config.toml, or run python3 install.py.
 # The installer fills these machine-specific values from saved Pi defaults.
 # Keep credentials in Pi. Do not store them in this file.
 enabled = ["verify"]
@@ -11,9 +11,13 @@ model = "your-exact-model-id"
 thinking = "low"
 extensions = ["/absolute/path/to/.pi/agent/extensions/herdr-agent-state.ts"]
 timeout_seconds = 300
+# Required only for digest. Explicitly load the installed search extension.
+# search_extension = "/absolute/path/to/pi-web-search/src/index.ts"
 
 [paths]
 verification = "/absolute/path/to/pi-tejun/verification"
+# Digest workspace must exist and contain a manually editable watchlist.md.
+# digest_briefs = "~/src/default/digest-briefs"
 
 # Project-review configuration. Verify these machine-specific paths before use.
 # The three roots and output workspace must exist; excluded folders need not.

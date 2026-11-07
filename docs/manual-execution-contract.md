@@ -32,6 +32,11 @@ Later user-approved changes give each workflow its own named workspace, keep
 default tab names, and reject another run while that workspace contains tabs.
 This does not introduce a general report-validation framework or scheduler.
 
+[S009](project/work/S009-thematic-digest-workflow.md) adds the accepted `digest`
+workflow, explicit search extension loading, and a specific report/history check.
+Digest publication requires both a Markdown report and its coverage record;
+see the [authoring contract](workflow-authoring.md#generated-digests).
+
 ## User interface
 
 ```sh
@@ -39,6 +44,7 @@ tejun list
 tejun run
 tejun run content-smoke-test
 tejun run project-review
+tejun run digest
 ```
 
 `list` shows recognized workflows, their purpose, enabled state, and resolved
@@ -224,8 +230,12 @@ file is allowed. The workflow must enable the `read` tool. The launcher puts
 resolved history paths in the prompt with instructions to read them as data.
 It does not load old conversations, search run records for domain context, or
 interpret coverage and selection decisions. Neither current verification
-workflow declares history. Digest history content and update rules remain B003
-work.
+workflow declares history. Digest history instead uses a dedicated coverage
+context from published report/history pairs under `digest-briefs`. Its validator
+requires explicit outcomes for current topics, watchlist entries, and unresolved
+gaps. Report publication precedes the history completion marker; an incomplete
+or inconsistent pair blocks later runs rather than silently advancing coverage.
+Technical success and incomplete research remain distinct.
 
 Different workflows may overlap even in the same output directory because
 each result has its own name. The same workflow cannot overlap while its named

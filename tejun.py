@@ -20,7 +20,10 @@ import tomllib
 import uuid
 
 ROOT = Path(__file__).resolve().parent
-CONFIG = Path(os.environ.get("TEJUN_CONFIG", "~/.local/share/pi-tejun/config.toml")).expanduser().resolve()
+# Also support installed symlinks and importlib-based lifecycle probes.
+sys.path.insert(0, str(ROOT))
+import digest
+CONFIG = Path(os.environ.get("TEJUN_CONFIG", "~/.config/pi-tejun/config.toml")).expanduser().resolve()
 STATE = Path(os.environ.get("TEJUN_STATE_DIR", "~/.local/state/pi-tejun")).expanduser().resolve()
 SESSION = "tejun"
 
@@ -130,12 +133,19 @@ def validate_definition(item, label):
         if not re.fullmatch(r"[a-z][a-z0-9-]*", name):
             raise TejunError(f"Invalid skill name in {label}: {name!r}")
     check = item.get("result_check", "exact")
-    if not isinstance(check, str) or check not in {"exact", "project-review"}:
+    if not isinstance(check, str) or check not in {"exact", "project-review", "digest"}:
         raise TejunError(f"Unsupported result_check in {label}: {check!r}")
     if check == "exact":
         if ("input" in item) == ("result_text" in item):
             raise TejunError(f"{label} must declare exactly one of input or result_text.")
         text_field(item, "input" if "input" in item else "result_text", label)
+    elif check == "digest":
+        if item["name"] != "digest" or item["output_dir"] != "reports":
+            raise TejunError(f"{label}: digest check requires name=digest and output_dir=reports.")
+        if "input" in item or "result_text" in item:
+            raise TejunError(f"{label}: digest must not declare input/result_text.")
+        if not {"read", "write", "bash", "web_search"}.issubset(item["tools"]):
+            raise TejunError(f"{label}: digest requires read, write, bash, and web_search.")
     else:
         if "input" in item or "result_text" in item:
             raise TejunError(f"{label}: project-review uses context_paths, not input/result_text.")
@@ -148,7 +158,7 @@ def validate_definition(item, label):
     for key in ("history_inputs", "exclusive_paths"):
         string_list(item, key, label, default=[])
     fields = {"input_path", "output_path", "heading", "result_text",
-              "context_paths", "excluded_paths"}
+              "context_paths", "excluded_paths", "history_output", "digest_context"}
     try:
         for _, field, spec, conversion in Formatter().parse(item["prompt"]):
             if field is not None and (field not in fields or spec or conversion):
@@ -288,7 +298,7 @@ def prepare(workflow, config):
     if check == "exact":
         if not isinstance(text, str) or not text.strip():
             raise TejunError(f"Workflow input or result_text is empty or invalid: {source or workflow['name']}")
-    else:
+    elif check == "project-review":
         for key in workflow["context_paths"]:
             root = absolute(text_field(paths, key, f"{CONFIG}.paths"))
             if not root.is_dir():
@@ -309,6 +319,16 @@ def prepare(workflow, config):
         raise TejunError(f"Output directory is not a directory: {output_dir}")
     agent_dir = absolute(text_field(pi_config, "agent_dir", f"{CONFIG}.pi"))
     extensions = [absolute(path) for path in string_list(pi_config, "extensions", f"{CONFIG}.pi")]
+    digest_context = None
+    if check == "digest":
+        extensions.append(absolute(text_field(pi_config, "search_extension", f"{CONFIG}.pi")))
+        try:
+            digest_context = digest.inventory(workspace)
+        except (ValueError, OSError) as error:
+            raise TejunError(f"Digest recovery required: {error}") from error
+        watchlist = read_text(relative(workspace, "watchlist.md"), "digest watchlist")
+        digest_context["watchlist"] = [line[2:].strip() for line in watchlist.splitlines()
+                                       if line.startswith("- ") and line[2:].strip()]
     for path in [agent_dir / "AGENTS.md", ROOT / "extensions/workflow-check.ts", *extensions]:
         if not path.is_file():
             raise TejunError(f"Missing Pi/Kijun resource: {path}")
@@ -339,9 +359,9 @@ def prepare(workflow, config):
     if not isinstance(thinking, str) or thinking not in {
             "off", "minimal", "low", "medium", "high", "xhigh", "max"}:
         raise TejunError("Configure pi.thinking or workflow model.thinking as a valid thinking level.")
-    timeout = pi_config.get("timeout_seconds", 300)
+    timeout = workflow.get("timeout_seconds", pi_config.get("timeout_seconds", 300))
     if type(timeout) is not int or not 1 <= timeout <= 3600:
-        raise TejunError("pi.timeout_seconds must be an integer between 1 and 3600.")
+        raise TejunError("timeout_seconds must be an integer between 1 and 3600.")
     pi = shutil.which("pi")
     binary = shutil.which("herdr")
     if not pi or not binary:
@@ -357,7 +377,8 @@ def prepare(workflow, config):
     args += ["--extension", str(ROOT / "extensions/workflow-check.ts")]
     # Pi resolves the model and authenticates during the actual workflow.
     # The in-process extension prevents fuzzy model substitution before input.
-    return {"workspace": str(workspace), "input": str(source) if source else None, "output_dir": str(output_dir),
+    return {"digest_context": digest_context,
+            "workspace": str(workspace), "input": str(source) if source else None, "output_dir": str(output_dir),
             "expected": workflow["heading"] + "\n\n" + text.rstrip("\n") + "\n" if check == "exact" else None,
             "result_check": check, "context_paths": context, "excluded_paths": exclusions,
             "history_inputs": list(map(str, history)), "exclusive_paths": exclusive,
@@ -451,13 +472,29 @@ def launch(workflow, prepared):
                 pass
         except FileExistsError as error:
             raise TejunError(f"Refusing to replace existing partial output: {partial}") from error
+        history_partial = None
+        if prepared.get("result_check") == "digest":
+            history_dir = Path(prepared["workspace"]) / "history"
+            history_dir.mkdir(exist_ok=True)
+            history_output = history_dir / f"digest-{run_id}.json"
+            history_partial = history_output.with_suffix(".partial.json")
+            with history_partial.open("x", encoding="utf-8"):
+                pass
+            status.update(history_output=str(history_output), history_partial=str(history_partial))
+            # Refresh coverage after same-workflow exclusion below, before prompt construction.
         reserve_workflow_tab(workflow, prepared, run_dir, status)
+        if prepared.get("result_check") == "digest":
+            context = digest.inventory(Path(prepared["workspace"]))
+            context["watchlist"] = prepared["digest_context"]["watchlist"]
+            prepared["digest_context"] = context
         prompt = workflow["prompt"].format(input_path=json.dumps(prepared["input"]),
                                            output_path=json.dumps(str(partial)),
                                            heading=workflow["heading"],
                                            result_text=workflow.get("result_text", "").rstrip("\n"),
                                            context_paths=json.dumps(prepared.get("context_paths", {})),
-                                           excluded_paths=json.dumps(prepared.get("excluded_paths", [])))
+                                           excluded_paths=json.dumps(prepared.get("excluded_paths", [])),
+                                           history_output=json.dumps(str(history_partial)) if history_partial else "null",
+                                           digest_context=json.dumps(prepared.get("digest_context")))
         history = prepared.get("history_inputs", [])
         prompt += ("\n\nHistory policy: start a fresh conversation. Only the declared workflow "
                    "inputs and history files are history; do not resume sessions or search "
@@ -658,7 +695,15 @@ def worker(run_dir):
         partial = Path(status["partial"])
         if partial.is_symlink() or not partial.is_file():
             raise TejunError(f"Expected Markdown was not produced; agent left open in {status['pane']}.")
-        if request.get("result_check", "exact") == "project-review":
+        digest_record = None
+        if request.get("result_check") == "digest":
+            try:
+                digest_record = digest.validate(
+                    read_text(partial, "digest report"),
+                    digest.read_record(Path(status["history_partial"])), request["digest_context"])
+            except (ValueError, OSError) as error:
+                raise TejunError(f"Invalid digest: {error}") from error
+        elif request.get("result_check", "exact") == "project-review":
             validate_project_report(read_text(partial, "project review"), request)
         elif request.get("result_check", "exact") == "exact":
             if partial.read_bytes() != request["expected"].encode("utf-8"):
@@ -678,11 +723,19 @@ def worker(run_dir):
         status["agent_exited"] = True
         with defer_interrupts():
             publish_result(partial, Path(status["output"]))
+            if digest_record is not None:
+                # Pi has exited. Add the runner-owned digest hash before publishing
+                # the history completion marker. An orphan report blocks the next run.
+                history_partial = Path(status["history_partial"])
+                history_partial.write_text(json.dumps(digest_record, indent=2) + "\n")
+                publish_result(history_partial, Path(status["history_output"]))
             status["state"] = "success"
             save_status(run_dir, status)
         print(f"Completed {status['workflow']}: {status['output']}")
         try:
             partial.unlink()
+            if digest_record is not None:
+                Path(status["history_partial"]).unlink()
             close_finished_tab(binary, status)
             status["tab_closed"] = True
         except (TejunError, OSError, KeyError, TypeError, ValueError) as error:

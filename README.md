@@ -70,7 +70,7 @@ python3 install.py
 
 The installer creates `~/.local/bin/tejun` as a link to this checkout. Keep the
 checkout in place. On first installation, it creates local configuration at
-`~/.local/share/pi-tejun/config.toml` using your saved Pi provider, model, and
+`~/.config/pi-tejun/config.toml` using your saved Pi provider, model, and
 thinking defaults. It also creates a verification workspace with `input.md`.
 Existing local configuration is preserved. The installer refuses unrelated
 command collisions and does not change Pi settings or shell startup files.
@@ -81,6 +81,13 @@ If `~/.local/bin` is not already on `PATH`, add it for the current terminal:
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
+Existing installations must move their configuration from
+`~/.local/share/pi-tejun/config.toml` to `~/.config/pi-tejun/config.toml` before
+using the new default. The installer does not migrate the old file. Preserve
+its configured workspace paths; moving the configuration does not require
+moving reports, verification inputs, or run state. `TEJUN_CONFIG` still selects
+an alternative configuration file.
+
 Review the local configuration before running anything. `[pi]` selects the
 agent directory, provider, exact model, thinking level, Herdr status extension,
 and workflow timeout. Keep credentials in Pi, not in this file. Workflow
@@ -89,7 +96,7 @@ selects `openai/gpt-6.1-sol` with `low` thinking; check access before using it.
 The simpler `content-smoke-test` uses your local defaults.
 
 For the smoke test, add this entry to the existing `[paths]` table in
-`~/.local/share/pi-tejun/config.toml`:
+`~/.config/pi-tejun/config.toml`:
 
 ```toml
 content_production = "~/dev/default/content-production"
@@ -222,11 +229,59 @@ source, run project tests, change projects, or perform Git work. Its tools are
 not a read-only sandbox. Unreadable roots reject the run rather than imply an
 empty group; inaccessible project records must remain visible as uncertainty.
 
+## Discovery digest
+
+`tejun run digest` researches the agreed interests and writes concise English
+summaries with dates and source links. It uses the configured Pi model and
+thinking defaults, explicitly loads web search, and allows 900 seconds per run.
+It does not use subagents or create content assignments.
+
+Add these keys to the existing tables in your local configuration, adjusting
+the search extension path for your installed package:
+
+```toml
+[pi]
+search_extension = "/home/tom/.pi/agent/npm/node_modules/pi-web-search/src/index.ts"
+
+[paths]
+digest_briefs = "~/src/default/digest-briefs"
+```
+
+Do not duplicate tables or remove existing configuration. The selected search
+model must support the extension's search API and have working Pi credentials.
+Tejun disables ambient extensions, so installation alone does not enable search.
+
+The workspace must exist and contain `watchlist.md`. Add cases as top-level
+`- ` bullets, optionally describing which updates matter. An empty watchlist is
+allowed. The workflow reads but does not edit it. From inside Herdr, run:
+
+```sh
+tejun run digest
+```
+
+Reports go under `reports/`; separate JSON coverage records go under `history/`.
+The first run checks the preceding 24 hours. Later runs use the last published
+coverage boundary and retry unresolved gaps. Material updates are selected by
+significance rather than topic quotas; eight findings is normal guidance, not
+a hard limit. Unchanged watchlist cases are omitted.
+
+An empty digest says `No verified updates since the last check.` Incomplete
+research adds a brief qualification and retry notice, with detailed reasons in
+history. A successful run means valid output was published, not that every
+research check succeeded or that all important news was found.
+
+Report and history publication must both complete for success. The history
+record contains the report hash. Missing or inconsistent pairs block later runs
+with a recovery diagnostic. Preserve the report, partial files, history, and run
+diagnostics for inspection; do not fabricate history or advance the boundary to
+bypass the check. Coverage records are retained indefinitely initially.
+
 ## History and overlapping runs
 
 Every run starts a fresh Pi conversation with explicitly selected resources.
 There is no automatic session continuation or loading of previous run records.
-Workflow definitions may declare optional, workspace-relative `history_inputs`
+Digest history is supplied through its dedicated coverage context. Other
+workflow definitions may declare optional, workspace-relative `history_inputs`
 files. The launcher checks that they are readable and includes their resolved
 paths in the prompt for Pi to read as data. It does not decide what the history
 means, maintain a digest index, or update domain decisions.
@@ -283,8 +338,13 @@ S006 and S007 deliver the accepted `project-review` workflow, specific generated
 report validation, and per-workflow workspace isolation. Acceptance includes
 successful saved live runs and the user's manual observations; structural tests
 are not proof of model compliance. B002 is accepted, with the verification
-limitations recorded in its brief. Scheduled execution and the other proposed
-domain workflows remain unimplemented.
+limitations recorded in its brief.
+
+S008 and S009 deliver the accepted manual `digest` workflow, search integration,
+and recoverable coverage history. Acceptance includes an explicit limitation:
+non-empty watchlist behaviour has automated evidence but no live demonstration.
+B003 awaits separate brief-level review. Scheduled execution and the other
+proposed domain workflows remain unimplemented.
 
 - [Workflow authoring](docs/workflow-authoring.md) explains supported definition
   fields, local configuration, exact and generated-result checks, and adding a

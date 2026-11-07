@@ -6,8 +6,8 @@ an installer change, or an entry-point script in the destination repository.
 The installed command links to this checkout, so it sees a definition on its
 next invocation. Discovery does not depend on whether the file is committed.
 
-The runner supports exact-content Markdown verification and a specific
-`project-review` structural check. It does not provide a general validator for
+The runner supports exact-content Markdown verification and specific
+`project-review` and `digest` checks. It does not provide a general validator for
 arbitrary research reports. The walkthrough below adds an exact-content
 workflow; [project review](#generated-project-reviews) describes generated results.
 
@@ -57,7 +57,7 @@ Create an empty workspace outside this checkout:
 mkdir -p "$HOME/tejun-author-check"
 ```
 
-In `~/.local/share/pi-tejun/config.toml`, add the following key to the existing
+In `~/.config/pi-tejun/config.toml`, add the following key to the existing
 `[paths]` table. Do not create a duplicate table:
 
 ```toml
@@ -93,8 +93,8 @@ again is not required. `list` is discovery, not a complete preflight check.
 | `workspace` | Key in local `[paths]` selecting the working directory. |
 | `output_dir` | Relative output directory inside that workspace; `.` selects its root. |
 | `heading` | Exact Markdown heading for verification workflows; title prefix for the project-review prompt. Changing this field does not change the structural validator. |
-| `result_check` | Optional `exact` or `project-review`. Defaults to `exact`. |
-| `input` or `result_text` | For `exact`, declare exactly one. `input` is a relative UTF-8 file; `result_text` is a fixed nonempty body. Whitespace-only bodies are rejected. Neither is allowed for `project-review`. |
+| `result_check` | Optional `exact`, `project-review`, or `digest`. Defaults to `exact`. |
+| `input` or `result_text` | For `exact`, declare exactly one. `input` is a relative UTF-8 file; `result_text` is a fixed nonempty body. Whitespace-only bodies are rejected. Neither is allowed for `project-review` or `digest`. |
 | `context_paths` | Required for `project-review`: configuration keys `client_projects`, `personal_projects`, and `personal_repositories`, in that order. |
 | `excluded_paths` | Required for `project-review`: a list of configuration keys naming excluded paths. The working directory is also excluded. |
 | `tools` | Nonempty list passed to Pi's `--tools`. Enable only what the prompt needs. |
@@ -104,6 +104,7 @@ again is not required. `list` is discovery, not a complete preflight check.
 | `history_inputs` | Optional list of readable UTF-8 files relative to the workspace. Requires the `read` tool. |
 | `exclusive_paths` | Optional list of exact shared-file paths relative to the workspace, not directory trees. |
 | `[model]` | Optional `provider`, `id`, and `thinking` overrides for local defaults. Omitted fields use the corresponding local values. |
+| `timeout_seconds` | Optional top-level timeout override, from 1 through 3600 seconds. Otherwise uses the local Pi timeout. |
 
 All declared workspace-relative paths must resolve inside the workspace,
 including through symlinks. Input and history paths cannot select the workspace
@@ -123,6 +124,10 @@ The prompt supports only these placeholders:
   keys to resolved absolute paths. It is empty for exact-content workflows.
 - `{excluded_paths}` is a JSON list of resolved project-review exclusions.
   It is empty for exact-content workflows.
+- `{history_output}` is the JSON-quoted reserved partial history path for
+  digests, or `null` otherwise.
+- `{digest_context}` contains the digest interval, watchlist snapshot, topic
+  keys, and published coverage records as JSON, or `null` otherwise.
 
 Do not add quotation marks around the path placeholders. Literal braces in a
 prompt must be escaped as `{{` and `}}`. Attribute access, conversions, format
@@ -171,6 +176,28 @@ format requires matching validator and test changes, not just changing
 There is no decision-capture or implementation phase. Read current project
 records as evidence; do not create a decisions database or interpret a report
 as authorization. General Bash and write tools do not enforce these boundaries.
+
+## Generated digests
+
+[`digest.toml`](../workflows/digest.toml) uses `result_check = "digest"`, which
+requires workflow name `digest` and output directory `reports`. It enables
+`web_search` in addition to `read`, `write`, and `bash`. The local
+`[pi].search_extension` selects the explicitly loaded extension entry point.
+See [digest setup](../README.md#discovery-digest).
+
+The launcher snapshots top-level watchlist bullets and supplies prior published
+coverage through `{digest_context}`. The agent writes the reserved report and
+JSON history partials, not final paths. The digest check validates the period,
+required topic/watchlist coverage and gap retries, source links, and empty or
+incomplete-result notices. Previously covered source URLs require an explicit
+material-change description rather than `new`. This cannot prove that the
+change is material, that research happened, or that claims are correct.
+
+After confirmed Pi exit, the worker publishes the report, then its history
+completion marker containing the report hash. It refuses overwrite. An orphan
+or inconsistent pair blocks future runs for operator inspection. Publication is
+recoverable, not an atomic two-file transaction. The same-workflow busy rule
+prevents overlapping digest agents; history stays in the destination workspace.
 
 ## Configuration and authority ownership
 
@@ -225,7 +252,8 @@ close only their unchanged tab; Herdr removes a workspace with no tabs left.
 Failures retain the tab for inspection. See the
 [overlap policy](manual-execution-contract.md#history-and-overlap-policy).
 
-History is supplied only through declared `history_inputs`, as data. Neither
+General workflow history is supplied through declared `history_inputs`, as
+data. Digest-specific history is supplied through `{digest_context}` instead. Neither
 existing verification workflow loads previous run records as domain context.
 Project review reads current project records without replaying old reports.
 Workflows sharing mutable files must consistently declare `exclusive_paths`;

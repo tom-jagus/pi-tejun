@@ -184,6 +184,46 @@ class CliIntegrationTests(unittest.TestCase):
                          fixture["results"][status["workflow"]].encode("utf-8"))
         return status
 
+    def test_digest_installed_launch_and_repeated_coverage(self):
+        with self.installed() as fixture:
+            workspace = fixture["root"] / "digest"
+            workspace.mkdir()
+            (workspace / "watchlist.md").write_text("# Watchlist\n")
+            extension = fixture["root"] / "search.ts"
+            extension.write_text("fixture search extension\n")
+            config = fixture["config"].read_text().replace(
+                "[pi]\n", "[pi]\nsearch_extension = " + json.dumps(str(extension)) + "\n")
+            fixture["config"].write_text(config + "digest_briefs = " + json.dumps(str(workspace)) + "\n")
+            fixture["destinations"]["digest"] = workspace / "reports"
+            previous = set()
+            previous_end = None
+            for _ in range(2):
+                (fixture["fake"] / "finish").unlink(missing_ok=True)
+                launched = self.cli(fixture, "run", "digest")
+                self.assertEqual(launched.returncode, 0, launched.stderr)
+                records = set((fixture["root"] / "state/runs").glob("*/status.json"))
+                record_path = (records - previous).pop()
+                status = json.loads(record_path.read_text())
+                request = json.loads((record_path.parent / "request.json").read_text())
+                context = request["digest_context"]
+                if previous_end:
+                    self.assertEqual(context["start"], previous_end)
+                self.assertIn("web_search", request["pi_args"][request["pi_args"].index("--tools") + 1])
+                report = ("# Digest - 2026-11-08\n\nCoverage: " + context["start"] +
+                          " to " + context["end"] + "\n\nNo verified updates since the last check.\n")
+                fixture["results"]["digest"] = report
+                (fixture["fake"] / "results.json").write_text(json.dumps(fixture["results"]))
+                history = {"version": 1, "start": context["start"], "end": context["end"],
+                           "coverage": [dict(subject=topic, start=context["start"], end=context["end"],
+                                             status="checked", reason="") for topic in context["topics"]],
+                           "findings": []}
+                Path(status["history_partial"]).write_text(json.dumps(history))
+                completed = self.complete(fixture, record_path)
+                self.assertTrue(Path(completed["history_output"]).is_file())
+                previous_end = context["end"]
+                previous = records
+            self.assertEqual(len(list((workspace / "reports").glob("*.md"))), 2)
+
     def test_both_workflows_share_installed_discovery_execution_and_repeat_policy(self):
         with self.installed() as fixture:
             listed = self.cli(fixture, "list")
@@ -448,7 +488,7 @@ class CliIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             checkout = Path(temp) / "checkout"
             checkout.mkdir()
-            for name in ("tejun.py", "install.py", "config.example.toml"):
+            for name in ("tejun.py", "digest.py", "install.py", "config.example.toml"):
                 shutil.copy2(ROOT / name, checkout / name)
             for name in ("workflows", "extensions"):
                 shutil.copytree(ROOT / name, checkout / name)
