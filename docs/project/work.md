@@ -2,7 +2,8 @@
 
 | Item | Outcome | Status | Blocker |
 |---|---|---|---|
-| [B002](work/B002-cross-project-review.md) | Recommend useful next actions across selected projects. | To do | Project coverage, priorities, and review rules undecided. |
+| [B002](work/B002-cross-project-review.md) | Recommend useful next actions across selected projects. | In progress | None; S006 accepted and S007 is next. |
+| [S007](work/S007-cross-project-review-workflow.md) | Deliver and verify the manual cross-project review workflow. | To do | None; contract accepted in S006. |
 | [B003](work/B003-thematic-discovery-digest.md) | Find sourced external topics worth exploring. | To do | Initial topics, selection criteria, and history policy undecided. |
 | [B004](work/B004-content-topic-research.md) | Propose relevant, practical content topics. | To do | Audience context and selection authority need definition. |
 | [B005](work/B005-selected-topic-preparation.md) | Prepare selected topics for presentation or publication review. | To do | Selection trigger and initial preparation format undecided. |

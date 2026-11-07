@@ -1,6 +1,6 @@
 ---
 id: B002
-status: To do
+status: In progress
 ---
 
 # Cross-project review
@@ -9,8 +9,8 @@ status: To do
 
 Help the user decide what to work on next by assessing selected projects,
 identifying useful next actions and refinement needs, and recommending
-cross-project priorities. Retain assessments and user decisions in
-`_projects-directions`.
+cross-project priorities. Save assessments in `_projects-directions`; keep
+user decisions and pause reasons in authoritative project records.
 
 ## Why
 
@@ -32,8 +32,9 @@ between existing commitments, new suggestions, and the user's decisions.
 
 ## Acceptance criteria
 
-- The report identifies which projects and evidence it assessed, and makes
-  missing or uncertain coverage explicit.
+- The report identifies assessed projects and relevant work in a concise format.
+  Recommendations are grounded in project documentation, and missing or
+  uncertain evidence is explicit without a separate evidence appendix.
 - Recommendations explain their relevance to the user's priorities and
   constraints, with supporting evidence and unresolved assumptions.
 - The result distinguishes actionable work, work needing refinement, blockers,
@@ -45,10 +46,18 @@ between existing commitments, new suggestions, and the user's decisions.
 - A run produces a reviewable result in the agreed destination without
   modifying the reviewed projects or treating recommendations as accepted work.
 
-## Open questions
+## Delivery plan
 
-- Which projects are included, and what rules distinguish `src` and `dev`?
-- What priorities, time constraints, and evidence should guide comparisons?
-- How should user decisions be captured and revisited without repeating reports
-  or duplicating project records?
-- What report length and level of repository inspection provide useful value?
+[S006](S006-cross-project-review-discovery.md) records the accepted review
+contract, including roots, exclusions, client-first ordering, concise report
+format, documentation-only inspection, and the verification plan. The user
+accepted closing discovery and authorized S007 implementation.
+
+[S007](S007-cross-project-review-workflow.md) delivers the workflow through the
+existing launcher. Pi follows workflow-owned instructions; shared code adds
+only the necessary generated-report validation, preserving existing exact-text
+checks. Separate project scanners, decision stores, and general frameworks are
+not required. Scheduled and event-triggered execution remains B007 work.
+
+Brief acceptance will assess the combined result against the criteria above,
+not infer success from completed slices or structural validation alone.
