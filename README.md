@@ -282,8 +282,9 @@ shared-file coordination are implemented and accepted.
 S006 and S007 deliver the accepted `project-review` workflow, specific generated
 report validation, and per-workflow workspace isolation. Acceptance includes
 successful saved live runs and the user's manual observations; structural tests
-are not proof of model compliance. B002 awaits its separate brief-level review.
-Scheduled execution and the other proposed domain workflows remain unimplemented.
+are not proof of model compliance. B002 is accepted, with the verification
+limitations recorded in its brief. Scheduled execution and the other proposed
+domain workflows remain unimplemented.
 
 - [Workflow authoring](docs/workflow-authoring.md) explains supported definition
   fields, local configuration, exact and generated-result checks, and adding a

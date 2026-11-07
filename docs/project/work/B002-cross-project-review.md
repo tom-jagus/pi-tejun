@@ -1,6 +1,6 @@
 ---
 id: B002
-status: Review
+status: Done
 ---
 
 # Cross-project review
@@ -41,8 +41,6 @@ existing project-local records are evidence, not a report-side decision store.
   constraints, with supporting evidence and unresolved assumptions.
 - The result distinguishes actionable work, work needing refinement, blockers,
   paused projects, and cases where no action is warranted.
-- Prior decisions, including declined suggestions and reasons for pausing work,
-  inform later reviews rather than being repeatedly ignored.
 - Cross-project recommendations and recorded user choices remain separate from
   the authoritative scope and status in individual projects.
 - A run produces a reviewable result in the agreed destination without
@@ -64,6 +62,14 @@ required. Scheduled and event-triggered execution remains B007 work.
 
 ## Review
 
-Both delivery slices are accepted. B002 is ready for its separate outcome-level
-assessment against the criteria above. Slice completion, successful execution,
-and structural validation do not automatically accept the brief.
+The user accepted B002 after the outcome-level review and removed the criterion
+about prior decisions. Decisions do not exclude projects from discovery; the two
+configured directory exclusions and the agreed eligibility rules still apply.
+The workflow does not maintain a decision file.
+
+The accepted S007 evidence includes two saved reports, successful live runs,
+and the user's manual observations of discovery and project preservation. The
+review also passed 65 Python tests and the Node extension test. The saved
+reports did not demonstrate paused or no-action cases; the user accepted this
+verification gap. Structural checks do not establish recommendation quality or
+complete coverage.
