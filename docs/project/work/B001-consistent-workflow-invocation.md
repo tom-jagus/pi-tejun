@@ -52,6 +52,8 @@ The [manual execution contract](../../manual-execution-contract.md) records the
 agreed simple launcher model and user-verified Herdr TUI lifecycle. No separate
 inspection command is required. Readable workflow definitions and configuration
 keep inputs, allowed effects, and output destinations knowable before execution.
-The launcher now starts or reuses a dedicated `tejun` Herdr session. The
-accepted manual execution evidence is recorded in S002; failure, repeatability,
-and overlap requirements remain in S003 and S004.
+The launcher starts or reuses a dedicated `tejun` Herdr session, preserves
+existing outputs, and coordinates declared shared files. Individual slice
+reviews record the accepted manual, failure, repeatability, and overlap
+evidence. Workflow-extension documentation and combined outcome verification
+remain in S005; B001 has not yet been accepted as a whole.

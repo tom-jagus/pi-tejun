@@ -139,26 +139,85 @@ means completion is pending. Inspect the status file for the final outcome and
 confirms completion. A missing final outcome is unconfirmed work, not success.
 `TEJUN_CONFIG` and `TEJUN_STATE_DIR` can override the local config and state paths.
 
-Output names include the workflow and a unique run identifier. Work is written
-to a `.partial.md` file, checked against the expected content, and renamed to
-`.md` only after Pi exits. Successful runs close their unchanged workflow tab.
-Blocked agents and invalid results remain available for diagnosis. Startup
-failures return an error; later handled failures record `incomplete`. Session
-startup diagnostics go to `~/.local/state/pi-tejun/herdr-server.log` by default.
+Output names include the workflow and a unique run identifier. The launcher
+reserves a new, empty `.partial.md` file before starting Pi. After exact-content
+validation and confirmed Pi exit, it publishes the final `.md` file without
+replacing any existing name, then removes the partial name. Publication uses
+an atomic hard link in the same directory, so the destination filesystem must
+support hard links. Existing run records and partial files are also preserved.
+Successful runs close their unchanged workflow tab. Cleanup errors are recorded
+without relabelling a published result as failed.
+
+All selected workflows undergo local input, configuration, and resource checks
+before session startup. Validation errors return diagnostics without launching
+an agent. Handled launch failures record `failed` once a run record exists;
+later execution failures record `incomplete`. Blocked or unsettled agents and
+invalid results remain available for diagnosis. Session startup diagnostics go
+to `~/.local/state/pi-tejun/herdr-server.log` by default.
+
+SIGINT or SIGTERM interruption of the launcher before worker handoff, or of
+the worker before publication, records an incomplete outcome where a run
+exists. Interrupting the worker does not necessarily stop its Pi agent. After
+successful worker handoff, work continues independently of the caller. SIGKILL
+and machine failure cannot produce a final status update; a run left at
+`started` or `working` is unconfirmed, not successful. Preserve its diagnostics
+and partial output until inspected.
 
 Do not treat a partial file, an old output, or a launch acknowledgement as a
-newly completed result. Failure, interruption, collision, and overlap coverage
-is still being completed in S003 and S004. The launcher does not accept results
-or authorize source changes, Git work, or publication. Workflow instructions
-are not filesystem or network access controls.
+newly completed result. The launcher does not accept results or authorize
+source changes, Git work, or publication. Workflow instructions are not
+filesystem or network access controls.
+
+## History and overlapping runs
+
+Every run starts a fresh Pi conversation with explicitly selected resources.
+There is no automatic session continuation or loading of previous run records.
+Workflow definitions may declare optional, workspace-relative `history_inputs`
+files. The launcher checks that they are readable and includes their resolved
+paths in the prompt for Pi to read as data. It does not decide what the history
+means, maintain a digest index, or update domain decisions.
+
+Runs that write only their unique result files can overlap, including in the
+same directory. A workflow that shares mutable files must declare their exact,
+workspace-relative paths in `exclusive_paths`. All workflows using the same
+shared mutable file must declare it consistently. These are file reservations,
+not directory-tree locks or restrictions on tool access. Their complete rules
+and recovery procedure are in the
+[execution contract](docs/manual-execution-contract.md#history-and-overlap-policy).
+
+Conflicting runs are rejected rather than queued. Reservations are released
+after confirmed Pi exit, or after a launch failure before agent startup was
+attempted. If an agent might still be running, reservations remain, even after
+a worker exits or is killed. Before manually removing a reservation, inspect
+its owner record and confirm that both its worker and Pi agent have stopped.
+Coordination requires the same Tejun state directory; separate state directories
+or hosts do not share reservations.
+
+## Validation
+
+Run the credential-free checks from this repository:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
+node --test tests/workflow-check.test.mjs
+PYTHONDONTWRITEBYTECODE=1 python3 tests/probes/s001-pi-contract.py
+```
+
+The extension tests require Node with built-in TypeScript type stripping. The
+Python suite includes disposable subprocess signals, cross-process reservations,
+concurrent session initialization, and an installed CLI plus detached worker
+using fake Herdr outside the repository. It does not start a real workflow or
+contact a model provider.
 
 ## Project status and documentation
 
-S002 is complete. Manual discovery, installation, and background execution are
-implemented. The user verified the smoke test inside and outside this
-repository, with results in the configured destination. S003 and S004 cover the
-remaining failure and repeatability work. Scheduled execution and domain
-workflows are not implemented.
+S001 through S004 are complete. Manual discovery, installation, background
+execution, failure handling, repeatability, and declared shared-file
+coordination are implemented. The user verified the S002 smoke test inside and
+outside this repository; S003/S004 add credential-free failure and concurrency
+checks. S005 remains for workflow-extension evidence, authoring documentation,
+and the combined B001 review. Scheduled execution and domain workflows are not
+implemented.
 
 - [Project charter](docs/project/charter.md) defines the purpose and boundaries.
 - [Manual execution contract](docs/manual-execution-contract.md) records the

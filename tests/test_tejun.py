@@ -41,7 +41,8 @@ class LauncherTests(unittest.TestCase):
                     tejun.herdr("herdr", "workspace", "list")
 
     def test_session_reuses_existing_server_without_starting_or_focusing(self):
-        with patch.object(tejun, "herdr", return_value={"workspaces": [{"workspace_id": "w7"}]}) as herdr, \
+        with tempfile.TemporaryDirectory() as temp, patch.object(tejun, "STATE", Path(temp)), \
+             patch.object(tejun, "herdr", return_value={"workspaces": [{"workspace_id": "w7"}]}) as herdr, \
              patch.object(tejun.subprocess, "Popen") as popen:
             self.assertEqual(tejun.ensure_session("herdr", Path("/tmp")), "w7")
             popen.assert_not_called()
@@ -81,7 +82,8 @@ class LauncherTests(unittest.TestCase):
                 self.assertIn("herdr-server.log", str(error.exception))
 
     def test_session_does_not_start_for_unrelated_errors(self):
-        with patch.object(tejun, "herdr", side_effect=tejun.TejunError("permission denied")), \
+        with tempfile.TemporaryDirectory() as temp, patch.object(tejun, "STATE", Path(temp)), \
+             patch.object(tejun, "herdr", side_effect=tejun.TejunError("permission denied")), \
              patch.object(tejun.subprocess, "Popen") as popen:
             with self.assertRaisesRegex(tejun.TejunError, "permission denied"):
                 tejun.ensure_session("herdr", Path("/tmp"))
@@ -155,7 +157,7 @@ class LauncherTests(unittest.TestCase):
                 self.assertEqual(fallback["provider"], "openai")
                 self.assertEqual(fallback["model"], "exact-id")
                 source.unlink()
-                with self.assertRaises(FileNotFoundError):
+                with self.assertRaisesRegex(tejun.TejunError, "Cannot read workflow input"):
                     tejun.prepare(workflow, config)
                 source.write_text("Declared input.\n")
                 with patch.object(tejun.shutil, "which", return_value=None):
@@ -227,6 +229,7 @@ class LauncherTests(unittest.TestCase):
                         "pi_args": [], "provider": "openai", "model": "exact-id"}
             tab = {"root_pane": {"pane_id": "w1:p99"}, "tab": {"tab_id": "w1:t99"}}
             with patch.object(tejun, "STATE", root / "state"), \
+                 patch.object(tejun, "ensure_session", return_value="w1"), \
                  patch.object(tejun, "herdr", return_value=tab) as herdr, \
                  patch.object(tejun.subprocess, "Popen") as popen, \
                  redirect_stdout(io.StringIO()) as output:

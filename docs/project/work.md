@@ -2,10 +2,8 @@
 
 | Item | Outcome | Status | Blocker |
 |---|---|---|---|
-| [B001](work/B001-consistent-workflow-invocation.md) | Invoke named workflows through one terminal interface. | In progress | None; S003 is next. |
-| [S003](work/S003-run-outcomes-and-failures.md) | Distinguish unsuccessful runs from completed results. | To do | None. |
-| [S004](work/S004-repeatable-isolated-runs.md) | Make repeated runs, history, and overlaps predictable. | To do | None. |
-| [S005](work/S005-workflow-extension-and-usage.md) | Add another workflow through the shared interface and document usage. | To do | Depends on S003 and S004. |
+| [B001](work/B001-consistent-workflow-invocation.md) | Invoke named workflows through one terminal interface. | In progress | None; S005 is next. |
+| [S005](work/S005-workflow-extension-and-usage.md) | Add another workflow through the shared interface and document usage. | To do | None. |
 | [B002](work/B002-cross-project-review.md) | Recommend useful next actions across selected projects. | To do | Project coverage, priorities, and review rules undecided. |
 | [B003](work/B003-thematic-discovery-digest.md) | Find sourced external topics worth exploring. | To do | Initial topics, selection criteria, and history policy undecided. |
 | [B004](work/B004-content-topic-research.md) | Propose relevant, practical content topics. | To do | Audience context and selection authority need definition. |

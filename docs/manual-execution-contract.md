@@ -16,9 +16,12 @@ that output reached the expected destination. Installation and runnable
 verification workflows are available; see the
 [setup instructions](../README.md#get-started).
 
-This contract also states the failure, repeatability, and overlap requirements
-that S003 and S004 must finish verifying. Their inclusion here does not mean
-those slices are complete.
+[S003](project/work/S003-run-outcomes-and-failures.md) and
+[S004](project/work/S004-repeatable-isolated-runs.md) implement the failure,
+repeatability, explicit-history, and overlap behavior below. Their accepted
+review evidence distinguishes credential-free checks from the earlier S002
+live demonstration. S005 still owns combined B001 verification and authoring
+documentation.
 
 ## User interface
 
@@ -48,8 +51,9 @@ starts work in the dedicated session named `tejun`, without focusing it or
 attaching the caller's terminal. If its server is not running, the launcher
 starts `herdr --session tejun server` as a detached process and waits for
 readiness. It creates an unfocused workspace if the session has none. It reuses
-a running session rather than starting another server. Other sessions remain
-untouched.
+a running session rather than starting another server. Server and workspace
+initialization are serialized with a local session lock so concurrent launches
+do not start competing servers. Other sessions remain untouched.
 
 The command waits for session and Pi startup, then returns a launch
 acknowledgement rather than waiting for workflow completion. Acknowledgement
@@ -74,10 +78,12 @@ local status and diagnostic files. It closes a successful workflow's tab only
 if that tab still contains just its original pane and no agent. Cleanup errors
 do not relabel a validated result as failed. The Herdr session stays running.
 
-`run` with several enabled workflows must not wait for their completion in the
-caller's terminal. Independent work can use separate terminals. Workflows that
-would conflict at the same output location must not run simultaneously. Do not
-build a general queue, scheduler, or multi-agent coordinator.
+`run` with several enabled workflows does not wait for their completion in the
+caller's terminal. All selected definitions, configuration, inputs, history
+files, and Pi resources are checked locally before session startup. Independent
+work uses separate tabs. A later runtime launch error does not roll back
+workflows already launched. Shared-file conflicts are rejected, not queued;
+there is no general scheduler or multi-agent coordinator.
 
 ## Ownership and configuration
 
@@ -114,6 +120,7 @@ Applicable destination and ancestor context instructions must be loaded. A
 workflow reading a different project must identify any additional instructions
 it needs; Pi does not automatically load every input directory's instructions.
 History consists of declared domain inputs, not automatic session continuation.
+The optional history and shared-file declarations are described below.
 
 Only load executable extensions and tools needed for the workflow and Herdr
 integration. Do not inherit every personal extension merely for convenience.
@@ -127,31 +134,96 @@ not source changes, Git mutations, acceptance, installation, or publication.
 Workflow instructions and a working directory are not filesystem or network
 access controls. Tools and extensions still operate with the user's permissions.
 
-## Results and basic failure handling
+## Results and failure handling
 
-The result is a ready-to-read Markdown file in the destination defined by the
-workflow. Use a unique output filename for each run so earlier files are
-preserved. Internal uniqueness is an implementation detail, not a user-facing
-run-management interface. Report the exact result path on completion.
+Each run has a unique local directory and output filename. Existing run
+directories, partial files, and final results are never replaced. The launcher
+reserves an empty `.partial.md` file before Pi startup so an earlier partial
+cannot establish success. Both verification workflows require exact UTF-8
+output bytes; absent, empty, incorrect, or symlinked results fail validation.
+A Herdr idle/done state alone does not establish success.
 
-Do not present an absent, empty, partial, or earlier result as newly completed
-work. Check that the current run completed and produced a nonempty Markdown
-result; use an exact expected result for the verification workflow. Keep partial
-output clearly labelled when work fails or is interrupted. A Herdr idle/done
-state alone is not proof that Markdown was produced successfully.
+After validating the result, the worker sends Ctrl+D and confirms that Pi has
+exited. It then creates the final `.md` name through an atomic same-directory
+hard link, which refuses any existing destination name, including a symlink.
+The destination filesystem must support hard links. The partial name is
+removed after publication; a cleanup failure may leave both names without
+invalidating the published result. Publication failure retains the partial
+and records an incomplete outcome. Exact paths appear in local status and
+worker diagnostics.
 
-Retain a small local status/diagnostic record identifying the workflow, time,
-output path, and success, failure, or incomplete outcome. On failure, include a
-useful reason and any partial-output location. Full transcripts, event archives,
-content-hash manifests, and a cross-directory publication protocol are not
-required. A missing completion record means unconfirmed work, not success.
+Local records identify the workflow, run, timestamps, session, result path,
+partial path, and outcome. Agent and pane identifiers are recorded when known;
+the worker records its PID. States `launching`, `started`, and `working` are
+nonterminal. `success` confirms validation, Pi exit, and publication. Handled
+launch failures record `failed`; handled execution failures or graceful
+interruption before publication record `incomplete`, with a reason. Input or
+configuration rejection before a run exists needs no run record. Full
+transcripts and event archives are not required.
 
-Reject missing dependencies, inputs, or configuration before launching where
-possible. Handle execution failure and cancellation without claiming success.
-Use focused checks for discovery, launch failure, result validation, repeated
-runs, and conflicting output paths, plus one real end-to-end demonstration.
-Do not require a live model call for every failure test or build a monitoring
-system around the launcher.
+SIGINT and SIGTERM use graceful interruption handlers. An interrupted worker
+retains diagnostics and partial output but does not necessarily stop its Pi
+agent. Startup interruption also retains any agent that may have been created.
+Signals are deferred across worker handoff and publication/status updates to
+avoid contradicting work already handed off or published. A worker starts with
+its interruption signals unblocked even if it inherited the parent's handoff
+mask. Cleanup failure or interruption after confirmed publication does not
+relabel success as failure.
+
+SIGKILL, power loss, and an unwritable state directory can prevent final status
+updates. Missing final evidence, including a run left at `working`, means
+unconfirmed work, never success. Do not infer completion from a PID, process
+exit, or an older file. Retain diagnostics rather than adding a monitoring
+service.
+
+## History and overlap policy
+
+Workflow definitions may add either or both of these optional top-level lists:
+
+```toml
+history_inputs = ["coverage-index.md"]
+exclusive_paths = ["coverage-index.md"]
+```
+
+These illustrate execution declarations, not an implemented digest workflow.
+Paths are relative to the configured workspace and must resolve inside it.
+History inputs must already be readable UTF-8 files; an empty initial history
+file is allowed. The workflow must enable the `read` tool. The launcher puts
+resolved history paths in the prompt with instructions to read them as data.
+It does not load old conversations, search run records for domain context, or
+interpret coverage and selection decisions. Neither current verification
+workflow declares history. Digest history content and update rules remain B003
+work.
+
+Without shared mutable files, independent runs may overlap even in the same
+output directory because each result has its own name. `exclusive_paths`
+declares exact shared-file resources that require exclusive use, not directory
+trees. Every workflow using a shared mutable file must declare the same
+resolved resource. Files need not exist yet; existing directory paths are
+rejected. Reservations do not grant permission to modify the resource or
+technically prevent undeclared writes.
+
+Before session startup, Tejun atomically creates reservation files under its
+local state directory, keyed by the resolved resource paths. Each records its
+owning run and status path. An existing reservation rejects a conflicting run
+with an actionable diagnostic. Acquiring several resources does not wait for
+busy ones; a pre-agent failure releases only reservations owned by that run.
+Runs with distinct resources remain independent.
+
+The worker releases reservations after confirmed Pi exit, including when final
+publication fails. Before agent startup has been attempted, a launch failure
+can also release its reservations. Otherwise reservations are retained because
+an agent might still be active. They do not expire based on age or a worker
+PID, and survive SIGKILL. Coordination applies only to workflows using the
+same Tejun state directory on the same host.
+
+To recover a retained reservation, inspect the exact reservation file named in
+the diagnostic and follow its `status` path. Confirm the owning worker has
+stopped, and inspect or stop that run's agent in the `tejun` session. Do not
+remove a reservation while either process might still be using the shared
+file. Once both have stopped, remove only that run's reservation files, retain
+its diagnostics and partial output, and invoke a fresh run. There is no
+automatic unlock command or hidden session continuation.
 
 ## Feasibility evidence
 
@@ -195,8 +267,14 @@ Markdown, the current model-check extension in their launch arguments, and
 successful tab cleanup. This is user-reported live execution supported by
 saved artifacts, not an automated desktop notification test.
 
-The current credential-free suite passes 13 tests covering installation,
-discovery, context preparation, session startup and reuse, detached launch,
-result validation, and safe cleanup. The five startup probes also pass. These
-checks support S002; they do not establish full S003 failure/cancellation or
-S004 collision/overlap coverage.
+The S002 snapshot passed 13 credential-free unit tests. The S003/S004 suite
+passes 36 Python tests, the Node extension checks, and the five Pi startup
+probes. It includes real disposable worker signals, cross-process shared-file
+conflicts, concurrent session initialization, and an installed CLI plus the
+real detached worker using fake Herdr from outside the repository. SIGKILL
+checks demonstrate unconfirmed status and retained reservations, not automatic
+crash recovery.
+
+No S003/S004 test calls a model provider or manipulates a real Herdr session.
+The source also passes a Python 3.11 syntax check. This is not a claim of a
+second live Pi/Herdr demonstration or runtime testing on Python 3.11.
