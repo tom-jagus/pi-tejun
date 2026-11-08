@@ -37,7 +37,9 @@ owned by `stream-studio`.
 - Significant factual claims are traceable to sources; uncertainties and facts
   needing verification are explicit.
 - Preparation suits the selected format and includes an understandable
-  structure, with demonstration needs and practical risks where applicable.
+  structure, with discussion or demonstration needs and practical risks where
+  applicable. Identify likely preparation effort and explain format suitability
+  when those decisions are still needed.
 - Claims of personal testing or results are supported by actual evidence,
   rather than generated to complete the narrative.
 - Related deliverables can reuse sources and context while remaining separately
