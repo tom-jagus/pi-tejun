@@ -26,6 +26,11 @@ researching content leads and a weekly technology calendarium.
 
 ## Agreed research contract
 
+This records the original accepted contract and verification plan. The user
+later removed brand guidance, JSON coverage history, report/history pairing,
+and automatic gap retries. Those requirements below are historical. Current
+scope is in B004 and S011; current behaviour is in the README.
+
 ### Purpose and inputs
 
 The workflow discovers subjects potentially worth creating content about. It

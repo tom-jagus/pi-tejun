@@ -6,6 +6,9 @@ parent: B002
 
 # Agree the cross-project review contract
 
+This is the original accepted discovery record. The user later simplified the
+report layout and structural checks. See the README for current behaviour.
+
 ## Outcome
 
 Resolve the decisions needed to deliver B002 as one useful manual workflow.

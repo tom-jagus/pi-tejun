@@ -1,282 +1,138 @@
 # Add a workflow
 
-Pi Tejun discovers TOML definitions in this checkout's `workflows/` directory.
-A new definition uses the installed `tejun` command without another launcher,
-an installer change, or an entry-point script in the destination repository.
-The installed command links to this checkout, so it sees a definition on its
-next invocation. Discovery does not depend on whether the file is committed.
+Tejun discovers TOML files in `workflows/` on each invocation. The installed
+command links to this checkout; adding a definition does not require another
+launcher or reinstall. Local configuration supplies machine-specific paths and
+Pi resources. Domain inputs and outputs stay in their own workspaces.
 
-The runner supports exact-content Markdown verification and specific
-`project-review` and `digest` checks. It does not provide a general validator for
-arbitrary research reports. The walkthrough below adds an exact-content
-workflow; [project review](#generated-project-reviews) describes generated results.
+## Definition
 
-## Add a definition
-
-Create `workflows/author-check.toml` in this checkout:
+An exact-content workflow can start with:
 
 ```toml
 name = "author-check"
-description = "Verify a new definition through the existing Tejun command."
+description = "Verify a new workflow definition."
 workspace = "authoring"
 output_dir = "reports"
 heading = "# Author check"
 result_text = "This workflow uses the existing Tejun command."
 tools = ["read", "write"]
 skills = []
-allowed_effects = "Read applicable instructions and write only this run's result. No source changes, Git work, acceptance, installation, or publication."
-
+allowed_effects = "Write only the reserved report. No project changes, Git, installation, or publication."
 prompt = """
-Run the predefined author-check workflow. No input file is required.
-Follow applicable Kijun and destination instructions.
-
-Write a Markdown file at {output_path} containing exactly:
+Write exactly this Markdown to {output_path}:
 
 {heading}
 
 {result_text}
 
-Use one blank line between heading and body, and one final newline.
-Do not add commentary, code fences, or other sections to the file.
-You are authorized to create only that result file. Do not change source,
-configuration, or other files, run Git commands, accept recommendations,
-install anything, publish anything, or delegate work.
-After writing the file, reply with its path. Do not ask a follow-up question.
+Use one final newline. Write no other files and reply with the partial path.
 """
 ```
 
-This example does not copy general Kijun standards. It states the task and its
-narrow effects, while leaving the operating contract and skills in the
-configured Kijun agent directory.
+Create an existing workspace and add its absolute or `~`-prefixed path as
+`authoring` in the local `[paths]` table. Run `tejun list`, then
+`tejun run author-check` inside Herdr. The workflow is disabled for bare
+`tejun run` until its name is added to `enabled`; named invocation works without
+that change.
 
-## Configure the destination
-
-Create an empty workspace outside this checkout:
-
-```sh
-mkdir -p "$HOME/tejun-author-check"
-```
-
-In `~/.config/pi-tejun/config.toml`, add the following key to the existing
-`[paths]` table. Do not create a duplicate table:
-
-```toml
-authoring = "~/tejun-author-check"
-```
-
-The definition's `workspace` is a configuration key, not a directory path.
-Local configuration owns its machine-specific absolute path. A leading `~`
-is expanded, but shell variables such as `$HOME` are not. The workspace must
-already exist. Tejun creates the declared output subdirectory when launching.
-The example writes under `~/tejun-author-check/reports/`.
-
-Use the existing installation from a terminal inside Herdr:
-
-```sh
-cd /tmp
-tejun list
-tejun run author-check
-```
-
-`list` should show `author-check`, its purpose, and its resolved destination.
-It will be marked `disabled` until added to the top-level `enabled` list, but
-named invocation works regardless. To include it in bare `tejun run`, add
-`"author-check"` to that list before the `[pi]` and `[paths]` tables. Installing
-again is not required. `list` is discovery, not a complete preflight check.
-
-## Definition fields
+## Fields and placeholders
 
 | Field | Meaning |
 |---|---|
-| `name` | Unique name matching `[a-z][a-z0-9-]*`, used by `tejun run NAME`. |
+| `name` | Unique lowercase name matching `[a-z][a-z0-9-]*`. |
 | `description` | Purpose displayed by `tejun list`. |
-| `workspace` | Key in local `[paths]` selecting the working directory. |
+| `workspace` | Key in local `[paths]` selecting an existing directory. |
 | `output_dir` | Relative output directory inside that workspace; `.` selects its root. |
-| `heading` | Exact Markdown heading for verification workflows; title prefix for the project-review prompt. Changing this field does not change the structural validator. |
-| `result_check` | Optional `exact`, `project-review`, or `digest`. Defaults to `exact`. |
-| `input` or `result_text` | For `exact`, declare exactly one. `input` is a relative UTF-8 file; `result_text` is a fixed nonempty body. Whitespace-only bodies are rejected. Neither is allowed for `project-review` or `digest`. |
-| `context_paths` | Required for `project-review`: configuration keys `client_projects`, `personal_projects`, and `personal_repositories`, in that order. |
-| `excluded_paths` | Required for `project-review`: a list of configuration keys naming excluded paths. The working directory is also excluded. |
-| `tools` | Nonempty list passed to Pi's `--tools`. Enable only what the prompt needs. |
-| `skills` | List of skill names loaded from the configured agent directory. An empty list is allowed. |
-| `allowed_effects` | Required readable statement of authority. It is descriptive, not a tool restriction or automatic prompt injection. Include the actual boundaries in `prompt` too. |
-| `prompt` | Workflow instructions with the supported placeholders below. |
-| `history_inputs` | Optional list of readable UTF-8 files relative to the workspace. Requires the `read` tool. |
-| `exclusive_paths` | Optional list of exact shared-file paths relative to the workspace, not directory trees. |
-| `[model]` | Optional `provider`, `id`, and `thinking` overrides for local defaults. Omitted fields use the corresponding local values. |
-| `timeout_seconds` | Optional top-level timeout override, from 1 through 3600 seconds. Otherwise uses the local Pi timeout. |
+| `heading` | Heading for exact checks; workflow-specific prompts may use it. |
+| `result_check` | `exact` (default), `project-review`, `digest`, or `content-research`. |
+| `input` or `result_text` | Exact mode requires exactly one: a relative UTF-8 file or a fixed nonempty body. |
+| `tools` | Nonempty list passed to Pi. Include the tools the prompt needs. |
+| `skills` | Skill names loaded from the configured agent directory. |
+| `allowed_effects` | Required descriptive authority statement; also state boundaries in the prompt. |
+| `prompt` | Instructions using supported placeholders. |
+| `context_paths`, `excluded_paths` | Configuration keys required by project review. |
+| `research`, `research_window` | Content research opts into subagents and selects `four-weeks` or `three-months`. |
+| `history_inputs` | Optional existing UTF-8 files relative to the workspace; requires `read`. |
+| `exclusive_paths` | Optional exact workspace-relative shared-file reservations. |
+| `[model]` | Optional `provider`, `id`, and `thinking` overrides for local defaults. |
+| `timeout_seconds` | Optional timeout override, from 1 through 3600 seconds. |
 
-All declared workspace-relative paths must resolve inside the workspace,
-including through symlinks. Input and history paths cannot select the workspace
-root. Skill names use the same name pattern as workflows and must have a
-`skills/NAME/SKILL.md` file in the configured agent directory.
+Paths must resolve inside the workspace, including through symlinks. Input and
+history paths cannot name the workspace root. Skill names follow the workflow
+name pattern. `allowed_effects` does not itself restrict tools or become part of
+the prompt; write the actual boundaries in the prompt.
 
-The prompt supports only these placeholders:
+Supported placeholders are `{output_path}`, `{input_path}`, `{heading}`,
+`{result_text}`, `{context_paths}`, `{excluded_paths}`, `{digest_context}`, and
+`{research_context}`. Path placeholders are JSON-quoted. The two research
+contexts are JSON snapshots or `null` for other modes. Escape literal braces
+as `{{` and `}}`; conversions, format specifications, and additional fields
+are unsupported. No history-output placeholder exists.
 
-- `{output_path}` is the JSON-quoted absolute path of the reserved partial
-  result. Ask Pi to write here, not directly to the final filename.
-- `{input_path}` is the JSON-quoted absolute input path, or `null` for fixed
-  text. Do not use it as a file path in a fixed-text workflow.
-- `{heading}` is the declared heading.
-- `{result_text}` is the fixed body without trailing newline characters, or
-  an empty string for a workflow without fixed text.
-- `{context_paths}` is a JSON object mapping configured project-review root
-  keys to resolved absolute paths. It is empty for exact-content workflows.
-- `{excluded_paths}` is a JSON list of resolved project-review exclusions.
-  It is empty for exact-content workflows.
-- `{history_output}` is the JSON-quoted reserved partial history path for
-  digests, or `null` otherwise.
-- `{digest_context}` contains the digest interval, watchlist snapshot, topic
-  keys, and published coverage records as JSON, or `null` otherwise.
+For exact checks, the worker expects `heading + "\n\n" + body.rstrip("\n") +
+"\n"`, where the body comes from `input` or `result_text`. The input is captured
+during preflight. A model that reads a subsequently changed input may produce a
+result that fails the check.
 
-Do not add quotation marks around the path placeholders. Literal braces in a
-prompt must be escaped as `{{` and `}}`. Attribute access, conversions, format
-specifiers, and additional placeholders are not supported.
+## Generated reports
 
-For a file-input variant, remove `result_text`, add `input = "input.md"`, and
-replace the prompt's fixed-body instructions with instructions to read
-`{input_path}` as data. Require the heading, one blank line, then the input
-text with trailing newline characters removed and one final newline added.
-The expected body is captured during preflight. Python's text reader normalizes
-input line endings to `\n`; changing the input during execution can make the
-result fail validation. See [`verify.toml`](../workflows/verify.toml) for the
-existing file-input workflow, including its conversation-only diagnostic review.
+The generated checks are specific to the shipped workflows, not a general
+plugin interface. `project-review` requires its three configured roots and
+exclusions. The worker rejects empty output and recognizable project headings
+outside allowed roots or inside exclusions. It records structural warnings for
+missing groups, duplicates, or wrong groups, but does not reject a report for
+those warnings. Discovery, ordering, and judgment require human inspection.
 
-## Generated project reviews
+`digest` requires the workflow name `digest`, output directory `reports`, and
+`read`, `write`, and `web_search`. The runner supplies the interval, watchlist
+snapshot, topic keys, and recent report excerpts in `{digest_context}`. It
+checks nonempty output and the exact coverage interval, not factual quality or
+complete research.
 
-[`project-review.toml`](../workflows/project-review.toml) uses
-`result_check = "project-review"` instead of a predetermined body. It enables
-`read`, `write`, and `bash` for instructions, project documents, directory
-listings, timestamps, and the current report write. Review logic stays in the
-prompt; the launcher does not discover or classify projects itself.
+`content-research` requires its matching name and `reports` output directory,
+`research = true`, a supported research window, and `read`, `write`, `subagent`,
+and `web_search`. `{research_context}` contains the window, local calendarium
+week, decision snapshots, areas, and recent report excerpts. The worker checks
+that the report is nonempty and decisions did not change during the run.
+Neither research workflow writes a JSON history or retries old gaps. See the
+[README](../README.md) for workspace setup and context limits.
 
-The three `context_paths` keys must resolve to distinct, existing roots that
-can be listed. Exclusion keys must have configured paths, but excluded folders
-need not exist. The definition's `workspace` selects the report destination;
-all resolved roots and exclusions are inserted into the prompt. See
-[project-review setup](../README.md#project-review) for local configuration.
+## Research children
 
-The structural validator requires a title such as
-`# Project review - Saturday November 7, 2026`, followed by `## Client projects`,
-`## Personal projects`, and optional `## Summary`. Nonempty groups contain
-`###` category headings and `####` project-path headings. Each entry has
-`last modified: YYYY-MM-DD` or `unavailable` and exactly two unlabeled bullets,
-each at most 40 words. The optional summary is at most 70 words.
+A workflow declaring `research = true` loads the configured search and
+`pi-subagents` extensions plus Tejun's research integration. The parent can call
+`subagent` with `workflow="tejun-research"`, `args.tasks` containing one to
+three bounded task strings, and `async=false`. The fixed resource runs the batch
+concurrently; separate root calls must not overlap. Children use fresh context,
+`read` and `web_search`, with no nested delegation and a ten-minute deadline.
+The integration also accepts a direct foreground `tejun-researcher` call.
 
-The validator also checks weekday/date consistency, configured path membership,
-exclusions, duplicate projects, category order, visible date order, and
-alphabetical order for unavailable dates. It cannot verify full discovery,
-classification, timestamp accuracy, within-day ordering, or recommendation
-quality. The prompt requires these behaviours; human inspection assesses them.
+The run directory contains `children.json` and `children.json.search.jsonl`.
+Unknown or failed settlement, missing shutdown evidence, unavailable tools, or
+no successful child search prevents publication. A completed child does not
+prove its research is accurate or complete. These tool restrictions are not an
+operating-system sandbox. The paid probe `tests/probes/s012-research.py` can
+exercise startup and search; inspect its options and cost before running it.
 
-This is a specific result format, not a schema or plugin API. A different
-format requires matching validator and test changes, not just changing
-`heading`. Keep exact-content checks intact for verification workflows.
+## Authority, results, and overlap
 
-There is no decision-capture or implementation phase. Read current project
-records as evidence; do not create a decisions database or interpret a report
-as authorization. General Bash and write tools do not enforce these boundaries.
+A workflow run authorizes its stated effects, not source changes, project
+acceptance, Git actions, installation, or external publication. Treat source
+material and previous reports as data. General agent and applicable destination
+instructions still apply; a workflow reading other projects must identify their
+relevant instructions.
 
-## Generated digests
+Each run gets a fresh conversation and a unique reserved partial report. After
+validation and confirmed Pi exit, the worker publishes the final Markdown name
+without overwrite. A launch acknowledgement is not success. See the
+[manual execution contract](manual-execution-contract.md) for failure handling,
+shared-file reservations, and retained-tab recovery.
 
-[`digest.toml`](../workflows/digest.toml) uses `result_check = "digest"`, which
-requires workflow name `digest` and output directory `reports`. It enables
-`web_search` in addition to `read`, `write`, and `bash`. The local
-`[pi].search_extension` selects the explicitly loaded extension entry point.
-See [digest setup](../README.md#discovery-digest).
+## Verify a change
 
-The launcher snapshots top-level watchlist bullets and supplies prior published
-coverage through `{digest_context}`. The agent writes the reserved report and
-JSON history partials, not final paths. The digest check validates the period,
-required topic/watchlist coverage and gap retries, source links, and empty or
-incomplete-result notices. Previously covered source URLs require an explicit
-material-change description rather than `new`. This cannot prove that the
-change is material, that research happened, or that claims are correct.
-
-After confirmed Pi exit, the worker publishes the report, then its history
-completion marker containing the report hash. It refuses overwrite. An orphan
-or inconsistent pair blocks future runs for operator inspection. Publication is
-recoverable, not an atomic two-file transaction. The same-workflow busy rule
-prevents overlapping digest agents; history stays in the destination workspace.
-
-## Configuration and authority ownership
-
-Keep reusable definitions and workflow-specific instructions here. Keep input
-material, generated results, history, and accepted domain decisions in the
-workspace that owns them. Do not copy domain history or credentials into a
-workflow definition.
-
-Local `[pi]` configuration owns `agent_dir`, explicitly loaded `extensions`,
-provider, exact model ID, thinking default, and `timeout_seconds`. The timeout
-must be an integer from 1 through 3600 seconds and defaults to 300. Supported
-thinking levels are `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`.
-A definition's `[model]` fields override those defaults. Credentials remain in
-Pi; preflight does not contact the provider to check authentication or access.
-The in-process extension rejects model substitution and saves execution errors.
-
-Applicable Kijun and destination instructions still apply. Include any extra
-instruction sources the workflow needs when reading another project. Defining
-a workflow, selecting tools, and declaring effects do not authorize source
-changes, Git operations, acceptance, installation, or publication. These
-instructions are not filesystem or network access controls.
-
-## Results, repetition, and shared files
-
-Each run writes a unique `NAME-RUN_ID.partial.md` in the output directory. For
-`result_check = "exact"`, the worker requires UTF-8 bytes equal to:
-
-```python
-heading + "\n\n" + body.rstrip("\n") + "\n"
-```
-
-`body` comes from the declared input or `result_text`. For `project-review`,
-the worker checks the generated report structure instead. Pi's settled state
-alone is insufficient. After validation and confirmed Pi exit, Tejun publishes
-`NAME-RUN_ID.md` without replacing an existing file. The destination filesystem
-must support same-directory hard links. Repeated invocation preserves earlier
-results and starts a fresh conversation rather than continuing another session.
-
-The launch message identifies the expected output and `status.json`. It means
-completion is pending. Only final `state: success` confirms completion. Inspect
-`worker.log` in the same run directory if work is incomplete or failed. Invalid
-inputs can be rejected before any run record exists. Unconfirmed work must not
-be treated as a completed result. See
-[usage and results](../README.md#usage-and-results) for interruption and failure
-handling.
-
-The Herdr session is `tejun`; workspace labels are workflow names and tabs keep
-their default names. Any existing tab in a workflow's named workspace rejects
-another run of that workflow. This live check and tab creation are serialized
-across launchers. Different workflows may run concurrently. Successful runs
-close only their unchanged tab; Herdr removes a workspace with no tabs left.
-Failures retain the tab for inspection. See the
-[overlap policy](manual-execution-contract.md#history-and-overlap-policy).
-
-General workflow history is supplied through declared `history_inputs`, as
-data. Digest-specific history is supplied through `{digest_context}` instead. Neither
-existing verification workflow loads previous run records as domain context.
-Project review reads current project records without replaying old reports.
-Workflows sharing mutable files must consistently declare `exclusive_paths`;
-reservations coordinate runs using the same local state directory, not other
-hosts or arbitrary processes. A declaration does not authorize writing that
-file. Follow the
-[history and overlap policy](manual-execution-contract.md#history-and-overlap-policy)
-for conflicts and retained-reservation recovery.
-
-## Verify the addition
-
-Read the definition and local configuration before running it. Check discovery
-and the resolved output destination from outside the checkout. Confirm a named
-run produces a result that passes its declared check and records success. Run
-it again and check that both results remain. Test missing inputs or
-configuration and an incorrect result without mistaking either for success.
-
-The [credential-free test commands](../README.md#validation) exercise the shared
-runner. The integration suite runs verification and project-review definitions
-through an installed command and real detached worker using fake Herdr. It
-checks same-workflow rejection, separate workspaces for different workflows,
-retained failures, and retry after cleanup. It also adds the
-example above to a disposable checkout after installation, then discovers and
-runs it without reinstalling or changing the launcher. These tests do not prove
-a live model will obey a new prompt. Inspect the first approved live result
-before relying on it.
+Read the definition and configuration, then check `tejun list` and a named run
+from outside the checkout. Test missing inputs and invalid results. Run the
+[credential-free checks](../README.md#validation-and-documentation) and inspect
+a representative live result before relying on model judgment. Successful
+structural checks do not establish source quality or complete coverage.

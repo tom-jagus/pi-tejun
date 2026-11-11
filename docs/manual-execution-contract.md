@@ -12,8 +12,8 @@ after completion. The user accepted removing the separate inspection command.
 During S002, the user replaced the existing `agent` session requirement with a
 dedicated Herdr session named `tejun`, started headlessly when needed. The user
 verified the current launcher inside and outside the repository and confirmed
-that output reached the expected destination. Installation and runnable
-verification workflows are available; see the
+that output reached the expected destination. The original verification
+workflows are no longer shipped; see the current
 [setup instructions](../README.md#get-started).
 
 [S003](project/work/S003-run-outcomes-and-failures.md) and
@@ -32,19 +32,19 @@ Later user-approved changes give each workflow its own named workspace, keep
 default tab names, and reject another run while that workspace contains tabs.
 This does not introduce a general report-validation framework or scheduler.
 
-[S009](project/work/S009-thematic-digest-workflow.md) adds the accepted `digest`
-workflow, explicit search extension loading, and a specific report/history check.
-Digest publication requires both a Markdown report and its coverage record;
-see the [authoring contract](workflow-authoring.md#generated-digests).
+[S009](project/work/S009-thematic-digest-workflow.md) records the originally
+accepted `digest` workflow. The user later replaced its coverage history and
+retry contract with bounded recent-report context and a single Markdown output.
+See the [authoring guide](workflow-authoring.md#generated-reports).
 
 ## User interface
 
 ```sh
 tejun list
 tejun run
-tejun run content-smoke-test
 tejun run project-review
 tejun run digest
+tejun run content-research
 ```
 
 `list` shows recognized workflows, their purpose, enabled state, and resolved
@@ -170,14 +170,12 @@ access controls. Tools and extensions still operate with the user's permissions.
 Each run has a unique local directory and output filename. Existing run
 directories, partial files, and final results are never replaced. The launcher
 reserves an empty `.partial.md` file before Pi startup so an earlier partial
-cannot establish success. Both verification workflows require exact UTF-8
-output bytes; absent, empty, incorrect, or symlinked results fail validation.
-Project review instead requires the dated title, group/category/project heading
-hierarchy, dates, configured project paths, unique entries, two short bullets,
-and optional short summary. It checks visible ordering, not independent project
-coverage, classification, or recommendation quality. An unreadable configured
-root rejects startup; instructions require inaccessible projects to remain
-visible without fabricated facts. This is not a filesystem sandbox.
+cannot establish success. Exact-mode definitions require exact UTF-8 output bytes; absent, empty, incorrect,
+or symlinked results fail validation. Project review requires nonempty output
+and rejects recognizable project paths outside configured roots or exclusions.
+Missing groups, wrong groups, and duplicates produce warnings. The checks do not
+prove discovery, classification, ordering, or recommendation quality. An
+unreadable configured root rejects startup. This is not a filesystem sandbox.
 
 A Herdr idle/done state alone does not establish success.
 
@@ -229,13 +227,11 @@ History inputs must already be readable UTF-8 files; an empty initial history
 file is allowed. The workflow must enable the `read` tool. The launcher puts
 resolved history paths in the prompt with instructions to read them as data.
 It does not load old conversations, search run records for domain context, or
-interpret coverage and selection decisions. Neither current verification
-workflow declares history. Digest history instead uses a dedicated coverage
-context from published report/history pairs under `digest-briefs`. Its validator
-requires explicit outcomes for current topics, watchlist entries, and unresolved
-gaps. Report publication precedes the history completion marker; an incomplete
-or inconsistent pair blocks later runs rather than silently advancing coverage.
-Technical success and incomplete research remain distinct.
+interpret coverage and selection decisions. The digest and content-research
+workflows instead receive excerpts from up to three recent finalized reports.
+Neither creates coverage JSON or automatically retries old research gaps. Legacy
+history files are ignored and preserved. Technical success does not establish
+complete or accurate research.
 
 Different workflows may overlap even in the same output directory because
 each result has its own name. The same workflow cannot overlap while its named

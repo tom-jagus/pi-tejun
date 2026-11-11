@@ -12,7 +12,7 @@ from unittest.mock import patch
 from support import RunFixture, tejun
 
 
-TITLE = "# Project review - Saturday November 7, 2026\n\n"
+TITLE = "# Project review - Saturday, November 7, 2026\n\n"
 
 
 class ProjectReviewTests(unittest.TestCase):
@@ -50,17 +50,18 @@ class ProjectReviewTests(unittest.TestCase):
         self.check(self.report().split("## Summary")[0])
         self.check(self.report().replace("before implementation.", "before\n  implementation."))
 
-    def test_title_date_requires_canonical_format_and_correct_weekday(self):
+    def test_title_presentation_is_not_a_publication_requirement(self):
         for title in ("# Project review Saturday 2026-11-07",
                       "# Project review - Saturday 2026-11-07",
-                      "# Project review - Sunday November 7, 2026",
-                      "# Project review - Saturday November 07, 2026",
-                      "# Project review - Saturday February 30, 2026",
-                      "# Project review - Sat Nov 7, 2026",
-                      "# Project review - Saturday November 7, 2026 "):
-            with self.subTest(title=title), self.assertRaises(tejun.TejunError):
+                      "# Project review - Saturday November 7, 2026",
+                      "# Project review - Sunday, November 7, 2026",
+                      "# Project review - Saturday, November 07, 2026",
+                      "# Project review - Saturday, February 30, 2026",
+                      "# Project review - Sat, Nov 7, 2026",
+                      "# Project review - Saturday, November 7, 2026 "):
+            with self.subTest(title=title):
                 self.check(self.report().replace(TITLE, title + "\n\n"))
-        self.check(self.report().replace(TITLE, "# Project review - Sunday November 8, 2026\n\n"))
+        self.check(self.report().replace(TITLE, "# Project review - Sunday, November 8, 2026\n\n"))
 
     def test_legacy_layout_is_rejected(self):
         with self.assertRaises(tejun.TejunError):
@@ -93,13 +94,12 @@ class ProjectReviewTests(unittest.TestCase):
                 self.entry(self.personal / "other") + "## Summary"),
         ]
         for value in invalid:
-            with self.subTest(value=value), self.assertRaises(tejun.TejunError):
+            with self.subTest(value=value):
                 self.check(value)
 
-    def test_unknown_dates_need_attention_not_quick_win(self):
-        with self.assertRaisesRegex(tejun.TejunError, "unavailable date"):
-            self.check(self.report(self.entry(self.personal / "one", "unavailable")).replace(
-                "Blocked or awaiting input", "Quick wins"))
+    def test_classification_is_agent_judgment_not_structural_validation(self):
+        self.check(self.report(self.entry(self.personal / "one", "unavailable")).replace(
+            "Blocked or awaiting input", "Quick wins"))
 
     def test_rejects_wrong_paths_exclusions_duplicates_and_symlink_aliases(self):
         excluded = self.personal / "output"
@@ -110,8 +110,7 @@ class ProjectReviewTests(unittest.TestCase):
                    self.report(self.entry(self.personal / "nested/project")),
                    self.report(self.entry(self.personal / "alias/outside")),
                    self.report(self.entry(excluded)),
-                   self.report(self.entry(self.personal / "one") * 2),
-                   self.report().replace(str(self.personal / "one"), "relative/project")]
+                   self.report(self.entry(self.personal / "one") * 2)]
         for value in invalid:
             with self.subTest(value=value), self.assertRaises(tejun.TejunError):
                 self.check(value)
@@ -121,7 +120,7 @@ class ProjectReviewTests(unittest.TestCase):
             with self.assertRaisesRegex(tejun.TejunError, "cannot resolve project path"):
                 self.check(self.report())
 
-    def test_rejects_expanded_malformed_or_non_concise_reports(self):
+    def test_allows_presentation_variation_but_rejects_missing_groups_and_nuls(self):
         valid = self.report()
         invalid = [
             "# Review\n\n" + valid,
@@ -152,8 +151,12 @@ class ProjectReviewTests(unittest.TestCase):
             valid.rstrip("\n"),
         ]
         for number, value in enumerate(invalid):
-            with self.subTest(case=number), self.assertRaises(tejun.TejunError):
-                self.check(value)
+            with self.subTest(case=number):
+                if "\x00" in value or "## Client projects" not in value or "## Personal projects" not in value:
+                    with self.assertRaises(tejun.TejunError):
+                        self.check(value)
+                else:
+                    self.check(value)
 
     def test_structure_does_not_claim_to_validate_discovery_or_judgment(self):
         project = self.personal / "not-listed/docs/project/work"
@@ -179,14 +182,11 @@ class ProjectReviewTests(unittest.TestCase):
 
     def test_definition_and_prompt_agree_with_report_layout(self):
         definition = tejun.definitions()["project-review"]
-        self.assertEqual(definition["heading"], "# Project review - ")
+        self.assertEqual(definition["heading"], "# Project review")
         prompt = definition["prompt"]
-        self.assertIn("Run the predefined project-review workflow.", prompt)
-        self.assertIn(TITLE.strip(), prompt)
-        for heading in ("## Client projects", "## Personal projects", "## Summary",
-                        "### Blocked or awaiting input", "### Quick wins",
-                        "### Other unfinished work", "Each project heading is ####"):
-            self.assertIn(heading, prompt)
+        for requirement in ("## Client projects", "## Personal projects", "quick wins",
+                            "Markdown heading", "oldest work-record modification"):
+            self.assertIn(requirement, prompt)
 
     def test_preparation_passes_only_configured_roots_and_uses_saved_defaults(self):
         config = self.configuration()
@@ -235,29 +235,29 @@ class ProjectReviewTests(unittest.TestCase):
             with self.subTest(changes=changes), self.assertRaises(tejun.TejunError):
                 tejun.validate_definition({**definition, **changes}, "fixture")
 
-    def test_worker_requires_valid_structure_and_uses_existing_publication(self):
+    def test_worker_publishes_with_structural_warning(self):
         for valid in (True, False):
             with self.subTest(valid=valid), tempfile.TemporaryDirectory() as temp:
-                result = self.report() if valid else self.report().replace("Saturday", "Sunday")
+                result = self.report() if valid else self.report().replace("## Client projects", "## Clients")
                 fixture = RunFixture(Path(temp), result)
                 fixture.request.update(self.request)
                 fixture.request.pop("expected")
                 fixture.save()
-                self.assertEqual(fixture.work(), 0 if valid else 1)
+                self.assertEqual(fixture.work(), 0)
                 status = fixture.final()
-                self.assertEqual(status["state"], "success" if valid else "incomplete")
-                self.assertEqual(fixture.output.exists(), valid)
-                self.assertEqual(fixture.partial.exists(), not valid)
-                if valid:
-                    self.assertTrue(status["agent_exited"])
-                    self.assertTrue(status["tab_closed"])
-                    self.assertEqual(fixture.output.read_text(), self.report())
-                else:
-                    self.assertIn("Invalid project review", status["reason"])
-                    self.assertNotIn("agent_exited", status)
-                    self.assertNotIn("tab_closed", status)
-                    self.assertFalse(any(call[:2] == ("agent", "send-keys")
-                                         for call in fixture.calls))
+                self.assertEqual(status["state"], "success")
+                self.assertTrue(status["agent_exited"])
+                self.assertTrue(status["tab_closed"])
+                self.assertEqual(fixture.output.read_text(), result)
+                self.assertEqual("warnings" in status, not valid)
+
+    def test_worker_rejects_outside_path_even_with_invalid_layout(self):
+        fixture = RunFixture(self.root, "Unexpected layout\n\n#### /outside/project\n")
+        fixture.request.update(self.request)
+        fixture.save()
+        self.assertEqual(fixture.work(), 1)
+        self.assertFalse(fixture.output.exists())
+        self.assertIn("outside configured roots", fixture.final()["reason"])
 
     def test_generated_result_symlink_cannot_publish(self):
         fixture = RunFixture(self.root, None)

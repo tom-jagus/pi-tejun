@@ -8,6 +8,10 @@ depends_on:
 
 # Deliver the manual thematic digest
 
+This record describes the original accepted delivery and evidence. The user
+later replaced JSON coverage history and automatic retries with bounded recent
+report excerpts. See B003 and the README for current scope and behaviour.
+
 ## Outcome
 
 Deliver a manually invoked digest workflow that researches selected interests,

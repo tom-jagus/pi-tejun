@@ -36,7 +36,7 @@ class CliIntegrationTests(unittest.TestCase):
             project.mkdir(parents=True)
             (project / "B001-example.md").write_text("---\nid: B001\nstatus: To do\n---\n")
             (project.parent / "work.md").write_text("Fixture work index\n")
-            report = ("# Project review - Saturday November 7, 2026\n\n## Client projects\n\n"
+            report = ("# Project review - Saturday, November 7, 2026\n\n## Client projects\n\n"
                       "### Blocked or awaiting input\n\n#### " + str(root / "client_projects/acme") +
                       "\n\nlast modified: 2026-11-01\n\n- B001 needs a decision.\n"
                       "- Resolve the recorded question.\n\n## Personal projects\n\nNo personal projects found.\n")
@@ -114,9 +114,8 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(status["tab_closed"])
         self.assertFalse(Path(status["partial"]).exists())
         self.assertTrue(Path(status["output"]).is_file())
-        if status["workflow"] == "digest":
-            self.assertTrue(Path(status["history_output"]).is_file())
-        else:
+        self.assertNotIn("history_output", status)
+        if status["workflow"] != "digest":
             self.assertEqual(Path(status["output"]).read_text(), fixture["results"][status["workflow"]])
         return status
 
@@ -152,9 +151,10 @@ class CliIntegrationTests(unittest.TestCase):
                 self.assertIn("--no-session", request["pi_args"])
                 self.assertIn("--no-extensions", request["pi_args"])
                 if name == "digest":
-                    prior = next(r for r in records if json.loads(r.read_text())["workflow"] == "digest")
-                    context = json.loads((prior.parent / "request.json").read_text())["digest_context"]
-                    self.assertEqual(request["digest_context"]["start"], context["end"])
+                    recent = request["digest_context"]["recent_reports"]
+                    self.assertEqual(len(recent), 1)
+                    self.assertEqual(request["digest_context"]["start"], recent[0]["started_at"])
+                    self.assertFalse((f["root"] / "digest/history").exists())
                     self.assertIn("web_search", request["pi_args"][request["pi_args"].index("--tools") + 1])
                 self.complete(f, record)
             self.assertEqual(snapshots, {p: p.read_bytes() for p in snapshots})
@@ -178,13 +178,13 @@ class CliIntegrationTests(unittest.TestCase):
     def test_invalid_generated_results_retain_agent_then_retry_after_cleanup(self):
         for name in ("digest", "project-review"):
             with self.subTest(workflow=name), self.installed() as f:
-                (f["root"] / "fake/results.json").write_text(json.dumps({name: "Wrong result.\n"}))
+                (f["root"] / "fake/results.json").write_text(json.dumps({name: "\n"}))
                 record = self.launch(f, name)
                 (f["root"] / "fake/finish").write_text("finish")
                 status = self.finished(record)
                 self.assertEqual(status["state"], "incomplete")
                 self.assertFalse(Path(status["output"]).exists())
-                self.assertEqual(Path(status["partial"]).read_text(), "Wrong result.\n")
+                self.assertEqual(Path(status["partial"]).read_text(), "\n")
                 self.assertNotIn("agent_exited", status)
                 agent = json.loads((f["root"] / "fake" / (status["agent"] + ".json")).read_text())
                 self.assertTrue(agent["active"])
@@ -195,13 +195,13 @@ class CliIntegrationTests(unittest.TestCase):
                 self.assertEqual(closed.returncode, 0, closed.stderr)
                 (f["root"] / "fake/results.json").write_text(json.dumps(f["results"]))
                 self.complete(f, self.launch(f, name))
-                self.assertEqual(Path(status["partial"]).read_text(), "Wrong result.\n")
+                self.assertEqual(Path(status["partial"]).read_text(), "\n")
 
     def test_definition_added_after_install_runs_without_launcher_changes(self):
         with tempfile.TemporaryDirectory() as temp:
             checkout = Path(temp) / "checkout"
             checkout.mkdir()
-            for name in ("tejun.py", "digest.py", "install.py", "config.example.toml"):
+            for name in ("tejun.py", "digest.py", "content_research.py", "install.py", "config.example.toml"):
                 shutil.copy2(ROOT / name, checkout / name)
             for name in ("workflows", "extensions"):
                 shutil.copytree(ROOT / name, checkout / name)

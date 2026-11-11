@@ -51,12 +51,7 @@ elif command == ["agent", "prompt"]:
     results = json.loads((root / "results.json").read_text())
     if request.get("result_check") == "digest":
         context = request["digest_context"]
-        record = {"version": 1, "start": context["start"], "end": context["end"],
-                  "coverage": [dict(subject=topic, start=context["start"], end=context["end"],
-                                    status="checked", reason="") for topic in context["topics"]],
-                  "findings": []}
-        Path(status["history_partial"]).write_text(json.dumps(record))
-        report = results.get("digest", "# Digest - 2026-11-08\n\nCoverage: " + context["start"] +
+        report = results.get("digest", "# Digest - Sunday, November 8, 2026\n\nCoverage: " + context["start"] +
                              " to " + context["end"] + "\n\nNo verified updates since the last check.\n")
     else:
         report = results[status["workflow"]]

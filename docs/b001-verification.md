@@ -1,5 +1,10 @@
 # B001 verification evidence
 
+This is historical acceptance evidence. The verification workflows, test names,
+report format, and coverage-history behaviour described below are not necessarily
+current. The `verify` and `content-smoke-test` definitions have been removed.
+See the [README](../README.md) for current workflows and test commands.
+
 This evidence maps the manual launcher to B001's acceptance criteria. The user
 explicitly delegated acceptance of S005 and B001 to a criteria-based review.
 Both passed that review. Their item records contain the acceptance basis; this
@@ -34,7 +39,7 @@ which also verifies that named invocation is independent of the enabled set.
 `test_enabled_workflows_launch_together_through_bare_run` checks the enabled
 set through the same installed command.
 
-The installation test in [`test_tejun.py`](../tests/test_tejun.py) checks
+The installation test in `test_tejun.py` (historical) checks
 repeatable installation, preservation of local configuration, and refusal to
 replace an unrelated command. The implementation does not change shell startup
 files or Pi settings.
@@ -50,8 +55,8 @@ The readable definitions declare these properties:
 
 | Definition | Input | Output destination | Effects |
 |---|---|---|---|
-| [`verify.toml`](../workflows/verify.toml) | `input.md` under `[paths].verification` | `reports/` under that workspace | Read input and instructions; write this run's result. A diagnostic design review stays in the Pi conversation. |
-| [`content-smoke-test.toml`](../workflows/content-smoke-test.toml) | Fixed `result_text`, no input file | Root of `[paths].content_production` | Read applicable instructions; write this run's result. |
+| `verify.toml` (removed) | `input.md` under `[paths].verification` | `reports/` under that workspace | Read input and instructions; write this run's result. A diagnostic design review stays in the Pi conversation. |
+| `content-smoke-test.toml` (removed) | Fixed `result_text`, no input file | Root of `[paths].content_production` | Read applicable instructions; write this run's result. |
 
 Both explicitly exclude source changes, Git work, acceptance, installation, and
 publication. `tejun list` shows purpose, enabled state, and output location; it
@@ -77,7 +82,7 @@ diagnostics, no published final result, and no agent shutdown or tab cleanup.
 Successful runs check exact result bytes, confirmed Pi exit, final publication,
 partial cleanup, and saved `success` rather than just launch acknowledgement.
 
-[`test_outcomes.py`](../tests/test_outcomes.py) checks missing and invalid
+`test_outcomes.py` (historical) checks missing and invalid
 inputs, unavailable resources and executables, malformed configuration and
 definitions, timeout, cancellation, invalid run requests, and blocked agents.
 It also checks absent, empty, incorrect, old, and symlinked outputs, and requires
@@ -102,7 +107,7 @@ run IDs, agent names, panes, and output paths, and rereads all earlier outputs
 to ensure they remain intact. Requests include `--no-session` and disabled
 ambient extensions. Each workflow uses the same result-handling path.
 
-[`test_isolation.py`](../tests/test_isolation.py) checks fresh explicit context,
+`test_isolation.py` (historical) checks fresh explicit context,
 only declared history, overlapping unique outputs, existing-name collisions,
 atomic no-overwrite publication, cross-process shared-file reservations,
 ownership-safe release, and serialized session initialization. A killed worker

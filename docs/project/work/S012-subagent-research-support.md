@@ -1,6 +1,6 @@
 ---
 id: S012
-status: Draft
+status: Done
 parent: B004
 depends_on:
   - S010
@@ -36,9 +36,25 @@ or accepting the content-topic research workflow itself.
 
 ## Tasks
 
-- [ ] Align the integration with the accepted S010 contract and identify the
+- [x] Align the integration with the accepted S010 contract and identify the
   smallest supported plugin and child profile configuration.
-- [ ] Deliver scoped launcher and configuration support without broadening
+- [x] Deliver scoped launcher and configuration support without broadening
   unrelated workflows.
-- [ ] Test parent and child tool availability, lifecycle, failure, and cleanup.
-- [ ] Present the integration and evidence for acceptance before S011 uses it.
+- [x] Test parent and child tool availability, lifecycle, failure, and cleanup.
+- [x] Present the integration and evidence for acceptance before S011 uses it.
+
+## Review
+
+The user accepted the delivered integration and authorized S011. Workflows
+explicitly opt in, load configured plugin resources, and use a fixed foreground
+research profile restricted to read and web_search. Retained child and search
+receipts prevent publication on missing, failed, or unknown child settlement
+and when no child search succeeded. Timeout and cancellation retain the parent
+and partials for inspection rather than claiming cleanup or success.
+
+Credential-free Python and JavaScript tests passed. A live Pi probe using
+Tejun's prepared arguments returned a child search result and recorded exactly
+read and web_search as active child tools. A missing-plugin startup probe
+retained an explicit diagnostic. These probes established startup and search
+access, not research accuracy. Full terminal integration is exercised by S011.
+See tests/probes/s012-research.py for the repeatable paid probe.

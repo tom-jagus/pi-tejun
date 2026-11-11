@@ -12,8 +12,10 @@ model = "your-exact-model-id"
 thinking = "low"
 extensions = ["/absolute/path/to/.pi/agent/extensions/herdr-agent-state.ts"]
 timeout_seconds = 300
-# Required only for digest. Explicitly load the installed search extension.
+# Required for digest and content-research. Load the installed search extension.
 # search_extension = "/absolute/path/to/pi-web-search/src/index.ts"
+# Required for workflows declaring research = true (pi-subagents 0.83.0).
+# subagent_extension = "/absolute/path/to/pi-subagents/bundle/index.js"
 
 [paths]
 # Digest workspace must exist and contain a manually editable watchlist.md.
@@ -21,9 +23,11 @@ timeout_seconds = 300
 
 # Project-review configuration. Verify these machine-specific paths before use.
 # The three roots and output workspace must exist; excluded folders need not.
-project_directions = "~/dev/default/_projects-directions"
+project_directions = "~/dev/_projects-directions"
 client_projects = "~/dev/clients"
 personal_projects = "~/dev/default"
 personal_repositories = "~/src/default"
-content_production = "~/dev/default/content-production"
+# Content research requires separate user-maintained pursue.json and reject.json
+# lists in this workspace. Entries have id, subject, optional sources and reason.
+content_production = "~/dev/content-production"
 # Keep enabled unchanged unless bare `tejun run` should also run the review.

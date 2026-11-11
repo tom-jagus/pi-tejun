@@ -6,6 +6,10 @@ parent: B003
 
 # Agree the thematic digest contract
 
+This is the original accepted discovery record. The user later replaced JSON
+coverage history and automatic retries with bounded recent-report excerpts.
+See B003 and the README for current scope and behaviour.
+
 ## Outcome
 
 Establish a practical contract for the first manual thematic digest and identify

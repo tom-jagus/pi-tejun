@@ -8,6 +8,10 @@ depends_on:
 
 # Deliver the manual cross-project review workflow
 
+This records the original accepted delivery and evidence. The user later
+simplified the report layout and structural checks. See the README for current
+behaviour.
+
 ## Outcome
 
 Deliver the named `project-review` workflow through the installed terminal
